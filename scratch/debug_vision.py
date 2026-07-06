@@ -52,6 +52,13 @@ def debug_capture():
         if img_bgr.shape[2] == 4:
             img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
 
+        # Save the full screenshot for coordinate calibration
+        full_screenshot_path = debug_dir / "full_screenshot.png"
+        cv2.imwrite(str(full_screenshot_path), img_bgr)
+        print(
+            f"Saved full screenshot to {full_screenshot_path} for coordinate calibration reference!"
+        )
+
         height, width = img_bgr.shape[:2]
         scale_x = width / 1920.0
         scale_y = height / 1080.0
