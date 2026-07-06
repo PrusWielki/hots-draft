@@ -1,0 +1,632 @@
+{
+  "kerrigan": {
+    "win_rate": 55.21,
+    "popularity": 5.45,
+    "pick_rate": 4.77,
+    "ban_rate": 0.68,
+    "games_played": 3876
+  },
+  "tyrael": {
+    "win_rate": 54.46,
+    "popularity": 15.2,
+    "pick_rate": 12.79,
+    "ban_rate": 2.41,
+    "games_played": 10402
+  },
+  "samuro": {
+    "win_rate": 54.19,
+    "popularity": 8.23,
+    "pick_rate": 5.56,
+    "ban_rate": 2.67,
+    "games_played": 4519
+  },
+  "malganis": {
+    "win_rate": 53.98,
+    "popularity": 36.24,
+    "pick_rate": 13.41,
+    "ban_rate": 22.84,
+    "games_played": 10900
+  },
+  "alarak": {
+    "win_rate": 53.89,
+    "popularity": 13.71,
+    "pick_rate": 9.73,
+    "ban_rate": 3.98,
+    "games_played": 7913
+  },
+  "deathwing": {
+    "win_rate": 53.76,
+    "popularity": 25.01,
+    "pick_rate": 9.29,
+    "ban_rate": 15.72,
+    "games_played": 7556
+  },
+  "tyrande": {
+    "win_rate": 53.59,
+    "popularity": 17.4,
+    "pick_rate": 16.25,
+    "ban_rate": 1.15,
+    "games_played": 13208
+  },
+  "gazlowe": {
+    "win_rate": 53.54,
+    "popularity": 8.77,
+    "pick_rate": 8.02,
+    "ban_rate": 0.75,
+    "games_played": 6518
+  },
+  "probius": {
+    "win_rate": 53.53,
+    "popularity": 1.73,
+    "pick_rate": 1.5,
+    "ban_rate": 0.23,
+    "games_played": 1218
+  },
+  "johanna": {
+    "win_rate": 53.32,
+    "popularity": 76.99,
+    "pick_rate": 24.31,
+    "ban_rate": 52.68,
+    "games_played": 19767
+  },
+  "hogger": {
+    "win_rate": 53.3,
+    "popularity": 20.61,
+    "pick_rate": 10.05,
+    "ban_rate": 10.56,
+    "games_played": 8174
+  },
+  "maiev": {
+    "win_rate": 53.27,
+    "popularity": 9.08,
+    "pick_rate": 6.16,
+    "ban_rate": 2.92,
+    "games_played": 5007
+  },
+  "sgt-hammer": {
+    "win_rate": 52.71,
+    "popularity": 7.83,
+    "pick_rate": 4.8,
+    "ban_rate": 3.04,
+    "games_played": 3899
+  },
+  "auriel": {
+    "win_rate": 52.54,
+    "popularity": 22.96,
+    "pick_rate": 17.02,
+    "ban_rate": 5.94,
+    "games_played": 13838
+  },
+  "rexxar": {
+    "win_rate": 52.46,
+    "popularity": 4.41,
+    "pick_rate": 3.51,
+    "ban_rate": 0.9,
+    "games_played": 2850
+  },
+  "tracer": {
+    "win_rate": 52.35,
+    "popularity": 5.19,
+    "pick_rate": 4.38,
+    "ban_rate": 0.81,
+    "games_played": 3557
+  },
+  "rehgar": {
+    "win_rate": 52.17,
+    "popularity": 24.18,
+    "pick_rate": 19.58,
+    "ban_rate": 4.6,
+    "games_played": 15916
+  },
+  "tychus": {
+    "win_rate": 52.07,
+    "popularity": 29.39,
+    "pick_rate": 21.73,
+    "ban_rate": 7.66,
+    "games_played": 17665
+  },
+  "illidan": {
+    "win_rate": 52.03,
+    "popularity": 13.12,
+    "pick_rate": 9.04,
+    "ban_rate": 4.08,
+    "games_played": 7353
+  },
+  "falstad": {
+    "win_rate": 52.02,
+    "popularity": 57.4,
+    "pick_rate": 22.29,
+    "ban_rate": 35.11,
+    "games_played": 18121
+  },
+  "lost-vikings": {
+    "win_rate": 52.01,
+    "popularity": 4.75,
+    "pick_rate": 2.14,
+    "ban_rate": 2.6,
+    "games_played": 1742
+  },
+  "arthas": {
+    "win_rate": 51.94,
+    "popularity": 23.98,
+    "pick_rate": 18.1,
+    "ban_rate": 5.89,
+    "games_played": 14712
+  },
+  "cho": {
+    "win_rate": 51.93,
+    "popularity": 5.4,
+    "pick_rate": 2.03,
+    "ban_rate": 3.37,
+    "games_played": 1654
+  },
+  "gall": {
+    "win_rate": 51.93,
+    "popularity": 3.47,
+    "pick_rate": 2.03,
+    "ban_rate": 1.44,
+    "games_played": 1654
+  },
+  "kharazim": {
+    "win_rate": 51.84,
+    "popularity": 7.56,
+    "pick_rate": 7.19,
+    "ban_rate": 0.37,
+    "games_played": 5847
+  },
+  "azmodan": {
+    "win_rate": 51.66,
+    "popularity": 25.15,
+    "pick_rate": 16.34,
+    "ban_rate": 8.8,
+    "games_played": 13288
+  },
+  "xul": {
+    "win_rate": 51.35,
+    "popularity": 8.21,
+    "pick_rate": 7.03,
+    "ban_rate": 1.18,
+    "games_played": 5712
+  },
+  "sylvanas": {
+    "win_rate": 51.21,
+    "popularity": 48.61,
+    "pick_rate": 24.6,
+    "ban_rate": 24.01,
+    "games_played": 20000
+  },
+  "whitemane": {
+    "win_rate": 51.21,
+    "popularity": 7.0,
+    "pick_rate": 6.1,
+    "ban_rate": 0.91,
+    "games_played": 4956
+  },
+  "lili": {
+    "win_rate": 51.2,
+    "popularity": 21.47,
+    "pick_rate": 17.07,
+    "ban_rate": 4.4,
+    "games_played": 13878
+  },
+  "raynor": {
+    "win_rate": 50.81,
+    "popularity": 19.77,
+    "pick_rate": 17.21,
+    "ban_rate": 2.56,
+    "games_played": 13994
+  },
+  "dva": {
+    "win_rate": 50.76,
+    "popularity": 7.83,
+    "pick_rate": 7.09,
+    "ban_rate": 0.74,
+    "games_played": 5766
+  },
+  "fenix": {
+    "win_rate": 50.7,
+    "popularity": 4.21,
+    "pick_rate": 3.85,
+    "ban_rate": 0.36,
+    "games_played": 3130
+  },
+  "zarya": {
+    "win_rate": 50.67,
+    "popularity": 3.71,
+    "pick_rate": 3.29,
+    "ban_rate": 0.42,
+    "games_played": 2678
+  },
+  "butcher": {
+    "win_rate": 50.54,
+    "popularity": 8.84,
+    "pick_rate": 6.69,
+    "ban_rate": 2.15,
+    "games_played": 5441
+  },
+  "thrall": {
+    "win_rate": 50.49,
+    "popularity": 32.51,
+    "pick_rate": 22.7,
+    "ban_rate": 9.82,
+    "games_played": 18452
+  },
+  "kelthuzad": {
+    "win_rate": 50.44,
+    "popularity": 9.84,
+    "pick_rate": 7.19,
+    "ban_rate": 2.64,
+    "games_played": 5849
+  },
+  "malthael": {
+    "win_rate": 50.37,
+    "popularity": 8.21,
+    "pick_rate": 6.56,
+    "ban_rate": 1.65,
+    "games_played": 5336
+  },
+  "uther": {
+    "win_rate": 50.36,
+    "popularity": 9.03,
+    "pick_rate": 7.95,
+    "ban_rate": 1.09,
+    "games_played": 6462
+  },
+  "blaze": {
+    "win_rate": 50.26,
+    "popularity": 10.85,
+    "pick_rate": 9.2,
+    "ban_rate": 1.65,
+    "games_played": 7481
+  },
+  "ragnaros": {
+    "win_rate": 50.24,
+    "popularity": 13.92,
+    "pick_rate": 9.65,
+    "ban_rate": 4.27,
+    "games_played": 7845
+  },
+  "qhira": {
+    "win_rate": 50.19,
+    "popularity": 6.8,
+    "pick_rate": 6.19,
+    "ban_rate": 0.62,
+    "games_played": 5029
+  },
+  "nazeebo": {
+    "win_rate": 50.15,
+    "popularity": 34.0,
+    "pick_rate": 24.96,
+    "ban_rate": 9.04,
+    "games_played": 20290
+  },
+  "sonya": {
+    "win_rate": 50.11,
+    "popularity": 10.79,
+    "pick_rate": 9.7,
+    "ban_rate": 1.09,
+    "games_played": 7887
+  },
+  "varian": {
+    "win_rate": 50.09,
+    "popularity": 23.63,
+    "pick_rate": 18.69,
+    "ban_rate": 4.94,
+    "games_played": 15198
+  },
+  "leoric": {
+    "win_rate": 50.01,
+    "popularity": 18.35,
+    "pick_rate": 15.38,
+    "ban_rate": 2.97,
+    "games_played": 12506
+  },
+  "orphea": {
+    "win_rate": 49.98,
+    "popularity": 8.41,
+    "pick_rate": 7.73,
+    "ban_rate": 0.67,
+    "games_played": 6286
+  },
+  "garrosh": {
+    "win_rate": 49.89,
+    "popularity": 51.6,
+    "pick_rate": 10.44,
+    "ban_rate": 41.16,
+    "games_played": 8486
+  },
+  "zeratul": {
+    "win_rate": 49.88,
+    "popularity": 8.93,
+    "pick_rate": 6.27,
+    "ban_rate": 2.67,
+    "games_played": 5094
+  },
+  "valla": {
+    "win_rate": 49.53,
+    "popularity": 49.11,
+    "pick_rate": 29.8,
+    "ban_rate": 19.31,
+    "games_played": 24230
+  },
+  "artanis": {
+    "win_rate": 49.52,
+    "popularity": 19.78,
+    "pick_rate": 15.02,
+    "ban_rate": 4.76,
+    "games_played": 12209
+  },
+  "etc": {
+    "win_rate": 49.51,
+    "popularity": 21.91,
+    "pick_rate": 16.46,
+    "ban_rate": 5.45,
+    "games_played": 13384
+  },
+  "junkrat": {
+    "win_rate": 49.47,
+    "popularity": 10.28,
+    "pick_rate": 8.06,
+    "ban_rate": 2.22,
+    "games_played": 6556
+  },
+  "jaina": {
+    "win_rate": 49.46,
+    "popularity": 12.47,
+    "pick_rate": 11.56,
+    "ban_rate": 0.91,
+    "games_played": 9397
+  },
+  "imperius": {
+    "win_rate": 49.44,
+    "popularity": 11.58,
+    "pick_rate": 9.92,
+    "ban_rate": 1.66,
+    "games_played": 8064
+  },
+  "liming": {
+    "win_rate": 49.3,
+    "popularity": 31.92,
+    "pick_rate": 22.3,
+    "ban_rate": 9.62,
+    "games_played": 18128
+  },
+  "mephisto": {
+    "win_rate": 49.21,
+    "popularity": 4.31,
+    "pick_rate": 3.57,
+    "ban_rate": 0.74,
+    "games_played": 2906
+  },
+  "lt-morales": {
+    "win_rate": 49.15,
+    "popularity": 9.42,
+    "pick_rate": 7.68,
+    "ban_rate": 1.75,
+    "games_played": 6240
+  },
+  "lunara": {
+    "win_rate": 49.08,
+    "popularity": 8.16,
+    "pick_rate": 7.56,
+    "ban_rate": 0.6,
+    "games_played": 6143
+  },
+  "anduin": {
+    "win_rate": 48.93,
+    "popularity": 53.04,
+    "pick_rate": 28.61,
+    "ban_rate": 24.43,
+    "games_played": 23264
+  },
+  "chen": {
+    "win_rate": 48.84,
+    "popularity": 33.57,
+    "pick_rate": 14.32,
+    "ban_rate": 19.24,
+    "games_played": 11646
+  },
+  "greymane": {
+    "win_rate": 48.84,
+    "popularity": 10.43,
+    "pick_rate": 9.35,
+    "ban_rate": 1.08,
+    "games_played": 7598
+  },
+  "brightwing": {
+    "win_rate": 48.81,
+    "popularity": 64.68,
+    "pick_rate": 23.55,
+    "ban_rate": 41.13,
+    "games_played": 19145
+  },
+  "tassadar": {
+    "win_rate": 48.66,
+    "popularity": 14.76,
+    "pick_rate": 13.78,
+    "ban_rate": 0.98,
+    "games_played": 11205
+  },
+  "dehaka": {
+    "win_rate": 48.56,
+    "popularity": 25.81,
+    "pick_rate": 9.77,
+    "ban_rate": 16.03,
+    "games_played": 7944
+  },
+  "mei": {
+    "win_rate": 48.41,
+    "popularity": 8.47,
+    "pick_rate": 7.17,
+    "ban_rate": 1.29,
+    "games_played": 5832
+  },
+  "kaelthas": {
+    "win_rate": 48.33,
+    "popularity": 32.86,
+    "pick_rate": 20.45,
+    "ban_rate": 12.4,
+    "games_played": 16629
+  },
+  "zuljin": {
+    "win_rate": 48.33,
+    "popularity": 11.11,
+    "pick_rate": 8.92,
+    "ban_rate": 2.19,
+    "games_played": 7252
+  },
+  "malfurion": {
+    "win_rate": 48.25,
+    "popularity": 12.19,
+    "pick_rate": 10.55,
+    "ban_rate": 1.64,
+    "games_played": 8574
+  },
+  "ana": {
+    "win_rate": 48.17,
+    "popularity": 8.83,
+    "pick_rate": 7.52,
+    "ban_rate": 1.31,
+    "games_played": 6114
+  },
+  "cassia": {
+    "win_rate": 48.04,
+    "popularity": 7.53,
+    "pick_rate": 7.08,
+    "ban_rate": 0.45,
+    "games_played": 5758
+  },
+  "deckard": {
+    "win_rate": 48.0,
+    "popularity": 10.57,
+    "pick_rate": 9.15,
+    "ban_rate": 1.42,
+    "games_played": 7438
+  },
+  "chromie": {
+    "win_rate": 47.9,
+    "popularity": 10.86,
+    "pick_rate": 7.89,
+    "ban_rate": 2.97,
+    "games_played": 6416
+  },
+  "stukov": {
+    "win_rate": 47.79,
+    "popularity": 26.17,
+    "pick_rate": 10.83,
+    "ban_rate": 15.33,
+    "games_played": 8808
+  },
+  "stitches": {
+    "win_rate": 47.78,
+    "popularity": 31.61,
+    "pick_rate": 18.51,
+    "ban_rate": 13.1,
+    "games_played": 15051
+  },
+  "guldan": {
+    "win_rate": 47.56,
+    "popularity": 14.74,
+    "pick_rate": 12.54,
+    "ban_rate": 2.2,
+    "games_played": 10195
+  },
+  "alexstrasza": {
+    "win_rate": 47.52,
+    "popularity": 4.69,
+    "pick_rate": 4.16,
+    "ban_rate": 0.52,
+    "games_played": 3384
+  },
+  "yrel": {
+    "win_rate": 47.37,
+    "popularity": 3.26,
+    "pick_rate": 2.94,
+    "ban_rate": 0.32,
+    "games_played": 2392
+  },
+  "zagara": {
+    "win_rate": 47.32,
+    "popularity": 8.48,
+    "pick_rate": 6.85,
+    "ban_rate": 1.63,
+    "games_played": 5571
+  },
+  "anubarak": {
+    "win_rate": 47.06,
+    "popularity": 21.58,
+    "pick_rate": 12.88,
+    "ban_rate": 8.71,
+    "games_played": 10468
+  },
+  "murky": {
+    "win_rate": 46.94,
+    "popularity": 5.11,
+    "pick_rate": 4.03,
+    "ban_rate": 1.08,
+    "games_played": 3279
+  },
+  "muradin": {
+    "win_rate": 46.74,
+    "popularity": 28.75,
+    "pick_rate": 23.54,
+    "ban_rate": 5.21,
+    "games_played": 19139
+  },
+  "hanzo": {
+    "win_rate": 46.49,
+    "popularity": 16.21,
+    "pick_rate": 13.17,
+    "ban_rate": 3.04,
+    "games_played": 10705
+  },
+  "valeera": {
+    "win_rate": 46.36,
+    "popularity": 4.55,
+    "pick_rate": 3.56,
+    "ban_rate": 0.99,
+    "games_played": 2895
+  },
+  "lucio": {
+    "win_rate": 46.32,
+    "popularity": 10.04,
+    "pick_rate": 8.26,
+    "ban_rate": 1.78,
+    "games_played": 6714
+  },
+  "genji": {
+    "win_rate": 46.09,
+    "popularity": 10.0,
+    "pick_rate": 6.47,
+    "ban_rate": 3.53,
+    "games_played": 5262
+  },
+  "nova": {
+    "win_rate": 45.12,
+    "popularity": 6.0,
+    "pick_rate": 5.42,
+    "ban_rate": 0.59,
+    "games_played": 4404
+  },
+  "medivh": {
+    "win_rate": 45.07,
+    "popularity": 6.98,
+    "pick_rate": 4.95,
+    "ban_rate": 2.02,
+    "games_played": 4025
+  },
+  "diablo": {
+    "win_rate": 44.83,
+    "popularity": 23.91,
+    "pick_rate": 15.0,
+    "ban_rate": 8.91,
+    "games_played": 12199
+  },
+  "abathur": {
+    "win_rate": 43.94,
+    "popularity": 18.23,
+    "pick_rate": 9.27,
+    "ban_rate": 8.96,
+    "games_played": 7537
+  }
+}
