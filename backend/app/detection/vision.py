@@ -53,18 +53,7 @@ def get_active_slots(step_idx: int, action: str) -> list[int]:
         elif step_idx in (9, 10):
             return [2]
     elif action == "pick":
-        if step_idx == 4:
-            return [0]
-        elif step_idx in (5, 6):
-            return [0, 1]
-        elif step_idx in (7, 8):
-            return [1, 2]
-        elif step_idx == 11:
-            return [2]
-        elif step_idx in (12, 13):
-            return [3, 4]
-        elif step_idx in (14, 15):
-            return [3, 4]
+        return [0, 1, 2, 3, 4]
     return []
 
 
