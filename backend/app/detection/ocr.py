@@ -113,9 +113,15 @@ def ocr_hero_from_crop(
     if _is_tesseract_usable():
         try:
             # Treat image as a single text line (PSM 7)
-            raw_text = pytesseract.image_to_string(
-                name_region, lang="pol+eng", config="--psm 7"
-            )
+            try:
+                raw_text = pytesseract.image_to_string(
+                    name_region, lang="pol+eng", config="--psm 7"
+                )
+            except Exception:
+                # Fall back to English if Polish training data is not installed
+                raw_text = pytesseract.image_to_string(
+                    name_region, lang="eng", config="--psm 7"
+                )
             text_clean = raw_text.strip()
             if text_clean:
                 hero_id = name_to_hero_id(text_clean)
