@@ -628,6 +628,15 @@
       <!-- System Actions -->
       <div class="h-6 w-px bg-gray-800"></div>
       
+      {#if !draftState.is_complete && draftState.current_step && draftState.current_step.action === "ban"}
+        <button
+          onclick={() => sendEvent("ban", { hero_id: "none" })}
+          class="btn btn-error btn-outline btn-sm font-semibold border-red-500/30 hover:bg-red-500 hover:text-white transition animate-fade-in"
+        >
+          No Ban
+        </button>
+      {/if}
+      
       <button
         onclick={undoLast}
         disabled={draftState.my_team_picks.length === 0 && draftState.enemy_picks.length === 0 && draftState.my_team_bans.length === 0 && draftState.enemy_bans.length === 0}
@@ -714,17 +723,24 @@
                 class="aspect-square rounded bg-gray-950/60 border {isCurrentTurn ? 'active-turn-ally border-cyan-400' : 'border-gray-850'} flex flex-col items-center justify-center relative overflow-hidden {heroId ? 'cursor-pointer' : ''}"
               >
                 {#if heroId}
-                  {@const hero = getHero(heroId)}
-                  <img
-                    src="{assetsUrl}/data/portraits/{heroId}.png"
-                    alt={hero.name}
-                    class="h-full w-full object-cover opacity-60 grayscale"
-                    onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
-                  />
-                  <div class="hidden absolute inset-0 flex items-center justify-center bg-cyan-950/80 font-bold text-xs text-cyan-300">
-                    {getRoleAbbreviation(hero.role)}
-                  </div>
-                  <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] py-0.5 text-center text-cyan-200 truncate">{hero.name}</span>
+                  {#if heroId === "none"}
+                    <div class="h-full w-full bg-gray-900 flex flex-col items-center justify-center relative">
+                      <span class="text-[10px] text-red-500 font-bold tracking-wider uppercase">No Ban</span>
+                      <div class="absolute inset-0 border border-red-500/20 pointer-events-none"></div>
+                    </div>
+                  {:else}
+                    {@const hero = getHero(heroId)}
+                    <img
+                      src="{assetsUrl}/data/portraits/{heroId}.png"
+                      alt={hero.name}
+                      class="h-full w-full object-cover opacity-60 grayscale"
+                      onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
+                    />
+                    <div class="hidden absolute inset-0 flex items-center justify-center bg-cyan-950/80 font-bold text-xs text-cyan-300">
+                      {getRoleAbbreviation(hero.role)}
+                    </div>
+                    <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] py-0.5 text-center text-cyan-200 truncate">{hero.name}</span>
+                  {/if}
                 {:else}
                   <span class="text-[10px] text-gray-600 font-bold">{isCurrentTurn ? 'BAN' : i+1}</span>
                 {/if}
@@ -1204,17 +1220,24 @@
             class="h-14 w-14 rounded bg-gray-950/60 border {isCurrentTurn ? 'active-turn-enemy border-rose-400' : 'border-gray-855'} flex flex-col items-center justify-center relative overflow-hidden {heroId ? 'cursor-pointer' : ''}"
           >
             {#if heroId}
-              {@const hero = getHero(heroId)}
-              <img
-                src="{assetsUrl}/data/portraits/{heroId}.png"
-                alt={hero.name}
-                class="h-full w-full object-cover opacity-60 grayscale"
-                onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
-              />
-              <div class="hidden absolute inset-0 flex items-center justify-center bg-rose-950/80 font-bold text-xs text-rose-300">
-                {getRoleAbbreviation(hero.role)}
-              </div>
-              <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] py-0.5 text-center text-rose-200 truncate">{hero.name}</span>
+              {#if heroId === "none"}
+                <div class="h-full w-full bg-gray-900 flex flex-col items-center justify-center relative">
+                  <span class="text-[9px] text-red-500 font-bold tracking-wider uppercase">No Ban</span>
+                  <div class="absolute inset-0 border border-red-500/20 pointer-events-none"></div>
+                </div>
+              {:else}
+                {@const hero = getHero(heroId)}
+                <img
+                  src="{assetsUrl}/data/portraits/{heroId}.png"
+                  alt={hero.name}
+                  class="h-full w-full object-cover opacity-60 grayscale"
+                  onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
+                />
+                <div class="hidden absolute inset-0 flex items-center justify-center bg-rose-950/80 font-bold text-xs text-rose-300">
+                  {getRoleAbbreviation(hero.role)}
+                </div>
+                <span class="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] py-0.5 text-center text-rose-200 truncate">{hero.name}</span>
+              {/if}
             {:else}
               <span class="text-[10px] text-gray-600 font-bold">{isCurrentTurn ? 'BAN' : i+1}</span>
             {/if}
