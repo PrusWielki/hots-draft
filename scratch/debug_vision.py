@@ -33,12 +33,17 @@ def debug_capture():
     # Load templates
     portraits_dir = repo_root / "data" / "portraits"
     templates = {}
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     if portraits_dir.exists():
         for file in portraits_dir.iterdir():
             if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
                 img = cv2.imread(str(file))
                 if img is not None:
-                    templates[file.stem] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    resized = cv2.resize(gray, (100, 100))
+                    cl_img = clahe.apply(resized)
+                    face_template = cl_img[20:80, 20:80]
+                    templates[file.stem] = face_template
         print(f"Loaded {len(templates)} templates for comparison.")
     else:
         print(f"Warning: Portraits directory not found at {portraits_dir}")
@@ -92,14 +97,16 @@ def debug_capture():
                 if templates:
                     gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                     resized_crop = cv2.resize(gray_crop, (100, 100))
+                    cl_crop = clahe.apply(resized_crop)
+                    search_area = cl_crop[10:90, 10:90]
 
                     matches = []
                     for hero_id, template in templates.items():
                         res = cv2.matchTemplate(
-                            resized_crop, template, cv2.TM_CCOEFF_NORMED
+                            search_area, template, cv2.TM_CCOEFF_NORMED
                         )
-                        score = res[0][0]
-                        matches.append((hero_id, score))
+                        _, max_val, _, _ = cv2.minMaxLoc(res)
+                        matches.append((hero_id, max_val))
 
                     matches.sort(key=lambda m: m[1], reverse=True)
                     print(f"    Top matches for {category}[{idx}]:")

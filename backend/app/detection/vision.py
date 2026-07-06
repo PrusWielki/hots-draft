@@ -56,8 +56,10 @@ class VisionDetector(BaseDetector):
         self.cooldown_until = 0.0
 
         if OPENCV_AVAILABLE:
+            self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             self._load_templates()
         else:
+            self.clahe = None
             print(
                 "Warning: opencv-python is not installed. VisionDetector will run in mock mode."
             )
@@ -72,7 +74,10 @@ class VisionDetector(BaseDetector):
                 img = cv2.imread(str(file))
                 if img is not None:
                     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                    self.templates[file.stem] = gray
+                    resized = cv2.resize(gray, (100, 100))
+                    cl_img = self.clahe.apply(resized)
+                    face_template = cl_img[20:80, 20:80]
+                    self.templates[file.stem] = face_template
         print(
             f"Loaded {len(self.templates)} portrait templates for vision recognition."
         )
@@ -172,18 +177,20 @@ class VisionDetector(BaseDetector):
 
             gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             resized_crop = cv2.resize(gray_crop, (100, 100))
+            cl_crop = self.clahe.apply(resized_crop)
+            search_area = cl_crop[10:90, 10:90]
 
             best_hero_id = None
             best_score = 0.0
 
             for hero_id, template in self.templates.items():
-                res = cv2.matchTemplate(resized_crop, template, cv2.TM_CCOEFF_NORMED)
-                score = res[0][0]
-                if score > best_score:
-                    best_score = score
+                res = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, _ = cv2.minMaxLoc(res)
+                if max_val > best_score:
+                    best_score = max_val
                     best_hero_id = hero_id
 
-            if best_score > 0.82 and best_hero_id:
+            if best_score > 0.80 and best_hero_id:
                 slot_key = f"{category}_{idx}"
                 current_candidate, count = self.detection_history.get(
                     slot_key, (None, 0)
