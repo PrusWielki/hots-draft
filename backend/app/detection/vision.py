@@ -12,27 +12,54 @@ try:
 except ImportError:
     OPENCV_AVAILABLE = False
 
+DEFAULT_COORDINATES = {
+    "ally_picks": [
+        {"x": 20, "y": 120, "w": 110, "h": 110},
+        {"x": 20, "y": 270, "w": 110, "h": 110},
+        {"x": 20, "y": 420, "w": 110, "h": 110},
+        {"x": 20, "y": 570, "w": 110, "h": 110},
+        {"x": 20, "y": 720, "w": 110, "h": 110},
+    ],
+    "enemy_picks": [
+        {"x": 1790, "y": 120, "w": 110, "h": 110},
+        {"x": 1790, "y": 270, "w": 110, "h": 110},
+        {"x": 1790, "y": 420, "w": 110, "h": 110},
+        {"x": 1790, "y": 570, "w": 110, "h": 110},
+        {"x": 1790, "y": 720, "w": 110, "h": 110},
+    ],
+    "ally_bans": [
+        {"x": 550, "y": 940, "w": 75, "h": 75},
+        {"x": 640, "y": 940, "w": 75, "h": 75},
+        {"x": 730, "y": 940, "w": 75, "h": 75},
+    ],
+    "enemy_bans": [
+        {"x": 1110, "y": 940, "w": 75, "h": 75},
+        {"x": 1200, "y": 940, "w": 75, "h": 75},
+        {"x": 1290, "y": 940, "w": 75, "h": 75},
+    ],
+}
+
 
 class VisionDetector(BaseDetector):
-    """OpenCV-based screen detection for HotS draft.
+    """OpenCV-based screen detection for HotS draft."""
 
-    Runs a background thread to capture screen regions, compare them
-    with template portraits in data/portraits/, and emit DraftEvents
-    when changes are detected.
-    """
-
-    def __init__(self, portraits_dir: Path):
+    def __init__(self, portraits_dir: Path, draft_manager: Any, on_match_callback: Any):
         super().__init__()
         self.portraits_dir = portraits_dir
+        self.draft_manager = draft_manager
+        self.on_match_callback = on_match_callback
         self.running = False
         self._thread: Optional[threading.Thread] = None
         self.templates: Dict[str, Any] = {}
+        self.coordinates = DEFAULT_COORDINATES
+        self.detection_history: Dict[str, tuple[str, int]] = {}
+        self.cooldown_until = 0.0
 
         if OPENCV_AVAILABLE:
             self._load_templates()
         else:
             print(
-                "Warning: opencv-python or numpy is not installed. VisionDetector will run in mock mode."
+                "Warning: opencv-python is not installed. VisionDetector will run in mock mode."
             )
 
     def _load_templates(self):
@@ -42,10 +69,10 @@ class VisionDetector(BaseDetector):
 
         for file in self.portraits_dir.iterdir():
             if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
-                # Load template in color or grayscale depending on matching preference
                 img = cv2.imread(str(file))
                 if img is not None:
-                    self.templates[file.stem] = img
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    self.templates[file.stem] = gray
         print(
             f"Loaded {len(self.templates)} portrait templates for vision recognition."
         )
@@ -64,28 +91,121 @@ class VisionDetector(BaseDetector):
             self._thread.join(timeout=1.0)
         print("VisionDetector background thread stopped.")
 
+    def trigger_cooldown(self, seconds: float = 5.0):
+        """Set a detection cooldown to prevent overriding manual overrides."""
+        self.cooldown_until = time.time() + seconds
+
     def _loop(self):
         """Main detection loop running periodically."""
         while self.running:
             try:
+                if time.time() < self.cooldown_until:
+                    time.sleep(0.5)
+                    continue
+
                 if OPENCV_AVAILABLE and self.templates:
                     self._perform_detection()
                 else:
-                    # Mock detection cycle
                     time.sleep(2.0)
             except Exception as e:
                 print(f"Error in vision detection loop: {e}")
                 time.sleep(5.0)
-            time.sleep(1.0)  # Check screen every second
+            time.sleep(0.8)
 
     def _perform_detection(self):
-        """Captured screen regions are matched against stored templates.
+        """Capture the target active slot and compare against templates."""
+        import mss
+        import numpy as np
 
-        Example implementation outline:
-        1. Capture HotS game window or main screen.
-        2. Crop specific pick/ban portrait slots.
-        3. Match cropped slots against loaded templates using cv2.matchTemplate.
-        4. If match confidence > threshold (e.g. 0.8), register pick/ban event.
-        """
-        # This will be fully implemented when screen coordinates and capture methods are calibrated
-        pass
+        step = self.draft_manager.get_current_step()
+        if not step:
+            return
+
+        category = None
+        idx = None
+
+        if step.action == "pick":
+            if step.team == "my_team":
+                category = "ally_picks"
+                idx = len(self.draft_manager.my_team_picks)
+            else:
+                category = "enemy_picks"
+                idx = len(self.draft_manager.enemy_picks)
+        elif step.action == "ban":
+            if step.team == "my_team":
+                category = "ally_bans"
+                idx = len(self.draft_manager.my_team_bans)
+            else:
+                category = "enemy_bans"
+                idx = len(self.draft_manager.enemy_bans)
+
+        if category is None or idx is None:
+            return
+
+        if idx >= len(self.coordinates[category]):
+            return
+
+        slot = self.coordinates[category][idx]
+
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]
+            screenshot = sct.grab(monitor)
+            img_bgr = np.array(screenshot)
+            if img_bgr.shape[2] == 4:
+                img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
+
+            height, width = img_bgr.shape[:2]
+            scale_x = width / 1920.0
+            scale_y = height / 1080.0
+
+            x = int(slot["x"] * scale_x)
+            y = int(slot["y"] * scale_y)
+            w = int(slot["w"] * scale_x)
+            h = int(slot["h"] * scale_y)
+
+            if x < 0 or y < 0 or x + w > width or y + h > height:
+                return
+
+            crop = img_bgr[y : y + h, x : x + w]
+            if crop.size == 0:
+                return
+
+            gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            resized_crop = cv2.resize(gray_crop, (100, 100))
+
+            best_hero_id = None
+            best_score = 0.0
+
+            for hero_id, template in self.templates.items():
+                res = cv2.matchTemplate(resized_crop, template, cv2.TM_CCOEFF_NORMED)
+                score = res[0][0]
+                if score > best_score:
+                    best_score = score
+                    best_hero_id = hero_id
+
+            if best_score > 0.82 and best_hero_id:
+                slot_key = f"{category}_{idx}"
+                current_candidate, count = self.detection_history.get(
+                    slot_key, (None, 0)
+                )
+
+                if current_candidate == best_hero_id:
+                    count += 1
+                else:
+                    current_candidate = best_hero_id
+                    count = 1
+
+                self.detection_history[slot_key] = (current_candidate, count)
+
+                if count >= 3:
+                    print(
+                        f"VisionDetector: Stably detected {best_hero_id} in {category}[{idx}] with score {best_score:.2f}"
+                    )
+                    success = self.draft_manager.apply_action(best_hero_id)
+                    if success:
+                        self.detection_history.pop(slot_key, None)
+                        self.on_match_callback()
+            else:
+                slot_key = f"{category}_{idx}"
+                if slot_key in self.detection_history:
+                    self.detection_history.pop(slot_key, None)

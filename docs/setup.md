@@ -108,3 +108,15 @@ To enable automated pre-commit linting:
 pre-commit install
 ```
 This runs validation and formatting checks automatically before each commit.
+
+---
+
+## OpenCV Screen Detection
+
+The helper includes an automated screen reader that captures the primary display and matches the active pick/ban slot against the loaded hero portraits in real-time.
+
+*   **Activation**: Ensure the backend python virtual environment has `opencv-python` and `mss` installed (automatically handled via `uv`).
+*   **How it Works**: The background thread dynamically captures screenshots, scales predefined coordinate slots to match your monitor's display resolution (proportional scaling based on a base target of 1920x1080), crops the active draft slot, and compares it to all templates using template matching (`cv2.matchTemplate`).
+*   **Debouncing**: Matches require 3 consecutive identical readings to transition into stable states, preventing transient hover frames or visual noise from triggering false picks/bans.
+*   **Manual Overrides Cooldown**: When a draft action is taken manually via the Svelte frontend, the vision detector enters a **6-second cooldown** to prevent the automated screen reader from immediately overwriting your manual overrides.
+

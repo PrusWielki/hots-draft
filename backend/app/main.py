@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -31,6 +32,7 @@ app.add_middleware(
 HERO_DB: Dict[str, Hero] = {}
 DRAFT_MANAGER = DraftManager(my_team_first=True)
 ACTIVE_WEBSOCKETS: Set[WebSocket] = set()
+VISION_DETECTOR = None
 
 
 def load_hero_db():
@@ -57,6 +59,26 @@ def load_hero_db():
 @app.on_event("startup")
 async def startup_event():
     load_hero_db()
+    global VISION_DETECTOR
+    repo_root = Path(__file__).resolve().parents[2]
+    portraits_dir = repo_root / "data" / "portraits"
+
+    from app.detection.vision import VisionDetector
+
+    loop = asyncio.get_running_loop()
+
+    def on_match():
+        asyncio.run_coroutine_threadsafe(broadcast_state(), loop)
+
+    VISION_DETECTOR = VisionDetector(portraits_dir, DRAFT_MANAGER, on_match)
+    VISION_DETECTOR.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global VISION_DETECTOR
+    if VISION_DETECTOR:
+        VISION_DETECTOR.stop()
 
 
 def get_current_payload() -> dict:
@@ -134,6 +156,9 @@ async def get_draft_state():
 @app.post("/api/draft/event")
 async def post_draft_event(event: DraftEvent):
     global DRAFT_MANAGER
+
+    if VISION_DETECTOR:
+        VISION_DETECTOR.trigger_cooldown(6.0)
 
     logger.info(
         f"Received draft event: {event.event_type} - {event.hero_id or event.map_name}"
