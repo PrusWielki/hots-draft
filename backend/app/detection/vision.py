@@ -65,21 +65,70 @@ class VisionDetector(BaseDetector):
             )
 
     def _load_templates(self):
-        """Load portrait templates from data/portraits/ for OpenCV matching."""
-        if not self.portraits_dir.exists():
-            return
+        """Load portrait templates for OpenCV matching.
 
-        for file in self.portraits_dir.iterdir():
-            if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
-                img = cv2.imread(str(file))
-                if img is not None:
-                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                    resized = cv2.resize(gray, (100, 100))
-                    cl_img = self.clahe.apply(resized)
-                    face_template = cl_img[20:80, 20:80]
-                    self.templates[file.stem] = face_template
+        Prefers ``data/draft_templates/`` (real in-game crops) over the
+        default ``data/portraits/`` sprite icons when both exist.
+        Pre-generates scaled variants (0.5–0.9) to handle size differences.
+        """
+        portraits_dir = self.portraits_dir
+        draft_dir = self.portraits_dir.parent / "draft_templates"
+
+        scales = [0.5, 0.6, 0.7, 0.8, 0.9]
+        border = 0.15  # strip outer 15% from draft templates to remove hex frame UI
+        for file in portraits_dir.iterdir():
+            if file.suffix not in (".png", ".jpg", ".jpeg") or file.stem == ".gitkeep":
+                continue
+            # Prefer real draft template if available
+            draft_file = draft_dir / file.name
+            is_draft = draft_file.exists()
+            src = draft_file if is_draft else file
+            img = cv2.imread(str(src))
+            if img is not None:
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                if is_draft:
+                    h, w = gray.shape
+                    b_h, b_w = int(h * border), int(w * border)
+                    gray = gray[b_h : h - b_h, b_w : w - b_w]
+                base = cv2.resize(gray, (100, 100))
+                variants = []
+                for s in scales:
+                    w_s = int(100 * s)
+                    h_s = int(100 * s)
+                    scaled = cv2.resize(base, (w_s, h_s))
+                    cl = self.clahe.apply(scaled)
+                    variants.append(cl)
+                self.templates[file.stem] = variants
+
+        # Also load any heroes present only in draft_templates (not in portraits)
+        if draft_dir.exists():
+            for file in draft_dir.iterdir():
+                if (
+                    file.suffix in (".png", ".jpg", ".jpeg")
+                    and file.stem not in self.templates
+                ):
+                    img = cv2.imread(str(file))
+                    if img is not None:
+                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                        h, w = gray.shape
+                        b_h, b_w = int(h * border), int(w * border)
+                        gray = gray[b_h : h - b_h, b_w : w - b_w]
+                        base = cv2.resize(gray, (100, 100))
+                        self.templates[file.stem] = [
+                            self.clahe.apply(
+                                cv2.resize(base, (int(100 * s), int(100 * s)))
+                            )
+                            for s in scales
+                        ]
+
+        draft_count = (
+            sum(1 for f in portraits_dir.iterdir() if (draft_dir / f.name).exists())
+            if draft_dir.exists()
+            else 0
+        )
         print(
-            f"Loaded {len(self.templates)} portrait templates for vision recognition."
+            f"Loaded {len(self.templates)} portrait templates "
+            f"({draft_count} using real draft crops, {len(scales)} scales each)."
         )
 
     def start(self):
@@ -178,19 +227,24 @@ class VisionDetector(BaseDetector):
             gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             resized_crop = cv2.resize(gray_crop, (100, 100))
             cl_crop = self.clahe.apply(resized_crop)
-            search_area = cl_crop[10:90, 10:90]
 
             best_hero_id = None
             best_score = 0.0
 
-            for hero_id, template in self.templates.items():
-                res = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
-                _, max_val, _, _ = cv2.minMaxLoc(res)
-                if max_val > best_score:
-                    best_score = max_val
-                    best_hero_id = hero_id
+            for hero_id, variants in self.templates.items():
+                for template in variants:
+                    if (
+                        template.shape[0] > cl_crop.shape[0]
+                        or template.shape[1] > cl_crop.shape[1]
+                    ):
+                        continue
+                    res = cv2.matchTemplate(cl_crop, template, cv2.TM_CCOEFF_NORMED)
+                    _, max_val, _, _ = cv2.minMaxLoc(res)
+                    if max_val > best_score:
+                        best_score = max_val
+                        best_hero_id = hero_id
 
-            if best_score > 0.80 and best_hero_id:
+            if best_score > 0.75 and best_hero_id:
                 slot_key = f"{category}_{idx}"
                 current_candidate, count = self.detection_history.get(
                     slot_key, (None, 0)
@@ -204,7 +258,7 @@ class VisionDetector(BaseDetector):
 
                 self.detection_history[slot_key] = (current_candidate, count)
 
-                if count >= 3:
+                if count >= 2:
                     print(
                         f"VisionDetector: Stably detected {best_hero_id} in {category}[{idx}] with score {best_score:.2f}"
                     )

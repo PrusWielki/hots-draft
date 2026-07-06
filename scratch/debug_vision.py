@@ -30,21 +30,28 @@ def debug_capture():
     debug_dir = repo_root / "data" / "debug_crops"
     debug_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load templates
+    # Load templates with multiple scales (matching production vision.py)
     portraits_dir = repo_root / "data" / "portraits"
     templates = {}
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    scales = [0.5, 0.6, 0.7, 0.8, 0.9]
     if portraits_dir.exists():
         for file in portraits_dir.iterdir():
             if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
                 img = cv2.imread(str(file))
                 if img is not None:
                     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                    resized = cv2.resize(gray, (100, 100))
-                    cl_img = clahe.apply(resized)
-                    face_template = cl_img[20:80, 20:80]
-                    templates[file.stem] = face_template
-        print(f"Loaded {len(templates)} templates for comparison.")
+                    base = cv2.resize(gray, (100, 100))
+                    variants = []
+                    for s in scales:
+                        w = int(100 * s)
+                        h = int(100 * s)
+                        scaled = cv2.resize(base, (w, h))
+                        variants.append(clahe.apply(scaled))
+                    templates[file.stem] = variants
+        print(
+            f"Loaded {len(templates)} templates ({len(scales)} scales each) for comparison."
+        )
     else:
         print(f"Warning: Portraits directory not found at {portraits_dir}")
 
@@ -98,15 +105,23 @@ def debug_capture():
                     gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                     resized_crop = cv2.resize(gray_crop, (100, 100))
                     cl_crop = clahe.apply(resized_crop)
-                    search_area = cl_crop[10:90, 10:90]
 
                     matches = []
-                    for hero_id, template in templates.items():
-                        res = cv2.matchTemplate(
-                            search_area, template, cv2.TM_CCOEFF_NORMED
-                        )
-                        _, max_val, _, _ = cv2.minMaxLoc(res)
-                        matches.append((hero_id, max_val))
+                    for hero_id, variants in templates.items():
+                        best = 0.0
+                        for template in variants:
+                            if (
+                                template.shape[0] > cl_crop.shape[0]
+                                or template.shape[1] > cl_crop.shape[1]
+                            ):
+                                continue
+                            res = cv2.matchTemplate(
+                                cl_crop, template, cv2.TM_CCOEFF_NORMED
+                            )
+                            _, max_val, _, _ = cv2.minMaxLoc(res)
+                            if max_val > best:
+                                best = max_val
+                        matches.append((hero_id, best))
 
                     matches.sort(key=lambda m: m[1], reverse=True)
                     print(f"    Top matches for {category}[{idx}]:")
