@@ -89,7 +89,13 @@ def ocr_hero_from_crop(
 
     name_region = extract_name_region(crop_bgr, is_ally=is_ally)
 
-    results = reader.readtext(name_region, detail=1, paragraph=False)
+    results = reader.readtext(
+        name_region,
+        detail=1,
+        paragraph=False,
+        canvas_size=600,
+        mag_ratio=1.0,
+    )
     if not results:
         return None, 0.0
 
