@@ -1,0 +1,111 @@
+import sys
+from pathlib import Path
+
+# Add backend directory to path so we can import modules
+repo_root = Path(__file__).resolve().parents[1]
+sys.path.append(str(repo_root / "backend"))
+
+try:
+    import cv2
+    import mss
+    import numpy as np
+
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+
+from app.detection.vision import DEFAULT_COORDINATES  # noqa: E402
+
+
+def debug_capture():
+    if not OPENCV_AVAILABLE:
+        print(
+            "Error: opencv-python or mss is not installed. Please run: pip install opencv-python mss numpy"
+        )
+        return
+
+    print("Starting Vision Debugger...")
+
+    # Create debug directory
+    debug_dir = repo_root / "data" / "debug_crops"
+    debug_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load templates
+    portraits_dir = repo_root / "data" / "portraits"
+    templates = {}
+    if portraits_dir.exists():
+        for file in portraits_dir.iterdir():
+            if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
+                img = cv2.imread(str(file))
+                if img is not None:
+                    templates[file.stem] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        print(f"Loaded {len(templates)} templates for comparison.")
+    else:
+        print(f"Warning: Portraits directory not found at {portraits_dir}")
+
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        print(f"Primary monitor dimensions: {monitor['width']}x{monitor['height']}")
+        screenshot = sct.grab(monitor)
+
+        img_bgr = np.array(screenshot)
+        if img_bgr.shape[2] == 4:
+            img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
+
+        height, width = img_bgr.shape[:2]
+        scale_x = width / 1920.0
+        scale_y = height / 1080.0
+
+        print(
+            f"Capture dimensions: {width}x{height} (Scale factors: X={scale_x:.2f}, Y={scale_y:.2f})"
+        )
+
+        for category, slots in DEFAULT_COORDINATES.items():
+            print(f"\nScanning category: {category}...")
+            for idx, slot in enumerate(slots):
+                x = int(slot["x"] * scale_x)
+                y = int(slot["y"] * scale_y)
+                w = int(slot["w"] * scale_x)
+                h = int(slot["h"] * scale_y)
+
+                # Boundary check
+                if x < 0 or y < 0 or x + w > width or y + h > height:
+                    print(f"  Slot {idx} coordinates out of bounds: x={x}, y={y}")
+                    continue
+
+                crop = img_bgr[y : y + h, x : x + w]
+                if crop.size == 0:
+                    continue
+
+                # Save cropped slot to folder
+                crop_path = debug_dir / f"{category}_{idx}.png"
+                cv2.imwrite(str(crop_path), crop)
+                print(f"  Saved crop for {category}[{idx}] to data/debug_crops/")
+
+                if templates:
+                    gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                    resized_crop = cv2.resize(gray_crop, (100, 100))
+
+                    matches = []
+                    for hero_id, template in templates.items():
+                        res = cv2.matchTemplate(
+                            resized_crop, template, cv2.TM_CCOEFF_NORMED
+                        )
+                        score = res[0][0]
+                        matches.append((hero_id, score))
+
+                    matches.sort(key=lambda m: m[1], reverse=True)
+                    print(f"    Top matches for {category}[{idx}]:")
+                    for hero_id, score in matches[:3]:
+                        print(f"      - {hero_id}: {score:.2f}")
+
+    print(
+        f"\nDone! Open the folder '{debug_dir.resolve()}' and check if the images contain the draft slots of the game."
+    )
+    print(
+        "If they are misaligned (showing the wrong area), adjust the x, y values in backend/app/detection/vision.py."
+    )
+
+
+if __name__ == "__main__":
+    debug_capture()
