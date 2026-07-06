@@ -308,9 +308,13 @@ class VisionDetector(BaseDetector):
                         f"VisionDetector: Stably detected {best_hero_id} in {category}[{idx}] with score {best_score:.2f}"
                     )
                     success = self.draft_manager.apply_action(best_hero_id)
+                    self.detection_history.pop(slot_key, None)
                     if success:
-                        self.detection_history.pop(slot_key, None)
                         self.on_match_callback()
+                    else:
+                        print(
+                            f"VisionDetector: Attempted to apply '{best_hero_id}' in {category}[{idx}] but draft manager rejected it (already picked/banned or invalid step)."
+                        )
             else:
                 slot_key = f"{category}_{idx}"
                 if slot_key in self.detection_history:

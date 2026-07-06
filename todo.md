@@ -283,4 +283,4 @@ Abathur
 
 	
 5. Handle not locked in picks/prepicks in OCR somehow (e.g. grayed out / animated text or prefix mapping for partial text if they are preselected but not confirmed).
-6. The OCR detected our first ban correcrlty and then it didnt detect anything for the rest of the draft
+6. (DONE) The OCR detected our first ban correcrlty and then it didnt detect anything for the rest of the draft (Fixed stuck detection history loop on rejected apply_action events)
