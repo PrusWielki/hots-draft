@@ -50,6 +50,22 @@
   let inspectedHeroId = $state("johanna");
   let inspectedHero = $derived(heroes.find(h => h.id === inspectedHeroId) || null);
   let selectedBuildIdx = $state(0);
+  let hoverTimeout = null;
+
+  function handleInspectHover(heroId) {
+    if (!heroId) return;
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    hoverTimeout = setTimeout(() => {
+      inspectedHeroId = heroId;
+    }, 600);
+  }
+
+  function clearInspectHover() {
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      hoverTimeout = null;
+    }
+  }
 
   $effect(() => {
     // Reset build index when inspected hero changes
@@ -509,6 +525,9 @@
   }
 
   function selectHero(heroId) {
+    if (!heroId) return;
+    clearInspectHover();
+    inspectedHeroId = heroId;
     if (draftState.is_complete) return;
     const step = draftState.current_step;
     if (!step) return;
@@ -690,7 +709,8 @@
             {@const isCurrentTurn = !draftState.is_complete && draftState.current_step && draftState.current_step.team === "my_team" && draftState.current_step.action === "pick" && draftState.my_team_picks.length === i}
             <div 
               role="presentation"
-              onmouseenter={() => heroId && (inspectedHeroId = heroId)}
+              onmouseenter={() => handleInspectHover(heroId)}
+              onmouseleave={clearInspectHover}
               class="flex items-center gap-3 p-2.5 rounded-lg bg-gray-900/40 border {isCurrentTurn ? 'active-turn-ally border-cyan-400' : 'border-gray-800/80'} h-[72px] {heroId ? 'cursor-pointer' : ''}"
             >
               {#if heroId}
@@ -731,8 +751,9 @@
               {@const isCurrentTurn = !draftState.is_complete && draftState.current_step && draftState.current_step.team === "my_team" && draftState.current_step.action === "ban" && draftState.my_team_bans.length === i}
               <div 
                 role="presentation"
-                onmouseenter={() => heroId && (inspectedHeroId = heroId)}
-                class="aspect-square rounded bg-gray-950/60 border {isCurrentTurn ? 'active-turn-ally border-cyan-400' : 'border-gray-850'} flex flex-col items-center justify-center relative overflow-hidden {heroId ? 'cursor-pointer' : ''}"
+                onmouseenter={() => handleInspectHover(heroId)}
+                onmouseleave={clearInspectHover}
+                class="aspect-square rounded bg-gray-950/60 border {isCurrentTurn ? 'active-turn-ally border-cyan-400' : 'border-gray-855'} flex flex-col items-center justify-center relative overflow-hidden {heroId ? 'cursor-pointer' : ''}"
               >
                 {#if heroId}
                   {#if heroId === "none"}
@@ -840,7 +861,8 @@
               {#each filteredHeroes as hero}
                 <button
                   onclick={() => selectHero(hero.id)}
-                  onmouseenter={() => inspectedHeroId = hero.id}
+                  onmouseenter={() => handleInspectHover(hero.id)}
+                  onmouseleave={clearInspectHover}
                   disabled={draftState.is_complete}
                   class="group flex flex-col items-center gap-1.5 p-1 bg-gray-900/30 hover:bg-gray-800/40 disabled:opacity-50 disabled:hover:bg-transparent rounded-lg border border-gray-800/80 hover:border-purple-500/50 transition duration-200"
                 >
@@ -946,7 +968,8 @@
                 {@const hero = getHero(rec.hero_id)}
                 <div 
                   role="presentation"
-                  onmouseenter={() => inspectedHeroId = rec.hero_id}
+                  onmouseenter={() => handleInspectHover(rec.hero_id)}
+                  onmouseleave={clearInspectHover}
                   onclick={() => selectHero(rec.hero_id)}
                   class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex flex-col gap-2 {activeRecTab === 'picks' ? 'hover:border-purple-500/30' : 'hover:border-red-500/30'} transition cursor-pointer"
                 >
@@ -1139,7 +1162,13 @@
                   <div class="flex flex-wrap gap-1">
                     {#each inspectedHero.synergies.slice(0, 4) as synId}
                       {@const synHero = getHero(synId)}
-                      <div role="presentation" class="group/syn relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer animate-fade-in" onmouseenter={() => inspectedHeroId = synId}>
+                      <div 
+                        role="presentation" 
+                        class="group/syn relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer animate-fade-in" 
+                        onmouseenter={() => handleInspectHover(synId)}
+                        onmouseleave={clearInspectHover}
+                        onclick={() => { inspectedHeroId = synId; clearInspectHover(); }}
+                      >
                         <img src="{assetsUrl}/data/portraits/{synId}.png" alt={synHero.name} class="h-full w-full object-cover" />
                         <div class="absolute bottom-full mb-1 hidden group-hover/syn:block bg-gray-900 border border-gray-700 text-white text-[9px] py-1 px-1.5 rounded shadow-xl whitespace-nowrap z-50">
                           {synHero.name}
@@ -1151,7 +1180,7 @@
                   <span class="text-gray-500 text-[9px]">No specific synergies</span>
                 {/if}
               </div>
-
+ 
               <!-- Counters -->
               <div class="flex flex-col gap-1">
                 <span class="font-bold text-amber-500 uppercase tracking-wider text-[9px]">Countered By</span>
@@ -1159,7 +1188,13 @@
                   <div class="flex flex-wrap gap-1">
                     {#each inspectedHero.counters.slice(0, 4) as cntId}
                       {@const cntHero = getHero(cntId)}
-                      <div role="presentation" class="group/cnt relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer" onmouseenter={() => inspectedHeroId = cntId}>
+                      <div 
+                        role="presentation" 
+                        class="group/cnt relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer" 
+                        onmouseenter={() => handleInspectHover(cntId)}
+                        onmouseleave={clearInspectHover}
+                        onclick={() => { inspectedHeroId = cntId; clearInspectHover(); }}
+                      >
                         <img src="{assetsUrl}/data/portraits/{cntId}.png" alt={cntHero.name} class="h-full w-full object-cover" />
                         <div class="absolute bottom-full mb-1 hidden group-hover/cnt:block bg-gray-900 border border-gray-700 text-white text-[9px] py-1 px-1.5 rounded shadow-xl whitespace-nowrap z-50">
                           {cntHero.name}
@@ -1192,7 +1227,8 @@
         {@const isCurrentTurn = !draftState.is_complete && draftState.current_step && draftState.current_step.team === "enemy" && draftState.current_step.action === "pick" && draftState.enemy_picks.length === i}
         <div 
           role="presentation"
-          onmouseenter={() => heroId && (inspectedHeroId = heroId)}
+          onmouseenter={() => handleInspectHover(heroId)}
+          onmouseleave={clearInspectHover}
           class="flex items-center gap-3 p-2.5 rounded-lg bg-gray-900/40 border {isCurrentTurn ? 'active-turn-enemy border-rose-400' : 'border-gray-855'} h-[72px] {heroId ? 'cursor-pointer' : ''}"
         >
           {#if heroId}
@@ -1233,7 +1269,8 @@
           {@const isCurrentTurn = !draftState.is_complete && draftState.current_step && draftState.current_step.team === "enemy" && draftState.current_step.action === "ban" && draftState.enemy_bans.length === i}
           <div 
             role="presentation"
-            onmouseenter={() => heroId && (inspectedHeroId = heroId)}
+            onmouseenter={() => handleInspectHover(heroId)}
+            onmouseleave={clearInspectHover}
             class="h-14 w-14 rounded bg-gray-950/60 border {isCurrentTurn ? 'active-turn-enemy border-rose-400' : 'border-gray-855'} flex flex-col items-center justify-center relative overflow-hidden {heroId ? 'cursor-pointer' : ''}"
           >
             {#if heroId}
