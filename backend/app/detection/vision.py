@@ -40,6 +40,34 @@ DEFAULT_COORDINATES = {
 }
 
 
+def get_active_slots(step_idx: int, action: str) -> list[int]:
+    """Map draft step index in sequence to physical screen slot indexes.
+
+    This accounts for double pick phases where players can lock in out-of-order.
+    """
+    if action == "ban":
+        if step_idx in (0, 1):
+            return [0]
+        elif step_idx in (2, 3):
+            return [1]
+        elif step_idx in (9, 10):
+            return [2]
+    elif action == "pick":
+        if step_idx == 4:
+            return [0]
+        elif step_idx in (5, 6):
+            return [0, 1]
+        elif step_idx in (7, 8):
+            return [1, 2]
+        elif step_idx == 11:
+            return [2]
+        elif step_idx in (12, 13):
+            return [3, 4]
+        elif step_idx in (14, 15):
+            return [3, 4]
+    return []
+
+
 class VisionDetector(BaseDetector):
     """OpenCV-based screen detection for HotS draft."""
 
@@ -164,7 +192,7 @@ class VisionDetector(BaseDetector):
             time.sleep(0.8)
 
     def _perform_detection(self):
-        """Capture the target active slot and compare against templates."""
+        """Capture active slots for the current draft step and compare against templates."""
         import mss
         import numpy as np
 
@@ -173,30 +201,20 @@ class VisionDetector(BaseDetector):
             return
 
         category = None
-        idx = None
-
         if step.action == "pick":
-            if step.team == "my_team":
-                category = "ally_picks"
-                idx = len(self.draft_manager.my_team_picks)
-            else:
-                category = "enemy_picks"
-                idx = len(self.draft_manager.enemy_picks)
+            category = "ally_picks" if step.team == "my_team" else "enemy_picks"
         elif step.action == "ban":
-            if step.team == "my_team":
-                category = "ally_bans"
-                idx = len(self.draft_manager.my_team_bans)
-            else:
-                category = "enemy_bans"
-                idx = len(self.draft_manager.enemy_bans)
+            category = "ally_bans" if step.team == "my_team" else "enemy_bans"
 
-        if category is None or idx is None:
+        if category is None:
             return
 
-        if idx >= len(self.coordinates[category]):
+        # Find which slot indices are active in the current draft step/phase
+        active_indices = get_active_slots(
+            self.draft_manager.current_step_idx, step.action
+        )
+        if not active_indices:
             return
-
-        slot = self.coordinates[category][idx]
 
         with mss.mss() as sct:
             monitor = sct.monitors[1]
@@ -209,47 +227,74 @@ class VisionDetector(BaseDetector):
             scale_x = width / 2560.0
             scale_y = height / 1440.0
 
-            x = int(slot["x"] * scale_x)
-            y = int(slot["y"] * scale_y)
-            w = int(slot["w"] * scale_x)
-            h = int(slot["h"] * scale_y)
+            # Scan all active slot indices in this step
+            for idx in active_indices:
+                if idx >= len(self.coordinates[category]):
+                    continue
 
-            if x < 0 or y < 0 or x + w > width or y + h > height:
-                return
+                slot = self.coordinates[category][idx]
+                x = int(slot["x"] * scale_x)
+                y = int(slot["y"] * scale_y)
+                w = int(slot["w"] * scale_x)
+                h = int(slot["h"] * scale_y)
 
-            crop = img_bgr[y : y + h, x : x + w]
-            if crop.size == 0:
-                return
+                if x < 0 or y < 0 or x + w > width or y + h > height:
+                    continue
 
-            best_hero_id: Optional[str] = None
-            best_score = 0.0
+                crop = img_bgr[y : y + h, x : x + w]
+                if crop.size == 0:
+                    continue
 
-            if step.action == "pick":
-                from app.detection.ocr import (  # noqa: PLC0415
-                    ocr_available,
-                    ocr_hero_from_crop,
-                )
+                best_hero_id: Optional[str] = None
+                best_score = 0.0
 
-                if ocr_available():
-                    is_ally = category == "ally_picks"
-                    BANNER_PAD = 150
-                    if is_ally:
-                        x_ocr = max(0, x - BANNER_PAD)
-                        w_ocr = (x + w) - x_ocr
-                    else:
-                        x_ocr = x
-                        w_ocr = min(width - x_ocr, w + BANNER_PAD)
-                    ocr_crop = img_bgr[y : y + h, x_ocr : x_ocr + w_ocr]
-                    hero_id, conf = ocr_hero_from_crop(ocr_crop, is_ally=is_ally)
-                    if hero_id and conf > 0.4:
-                        best_hero_id = hero_id
-                        best_score = conf
-                        print(
-                            f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
-                        )
+                if step.action == "pick":
+                    from app.detection.ocr import (  # noqa: PLC0415
+                        ocr_available,
+                        ocr_hero_from_crop,
+                    )
 
-                # Fallback to template matching if OCR didn't fire
-                if best_hero_id is None and self.templates:
+                    if ocr_available():
+                        is_ally = category == "ally_picks"
+                        BANNER_PAD = 150
+                        if is_ally:
+                            x_ocr = max(0, x - BANNER_PAD)
+                            w_ocr = (x + w) - x_ocr
+                        else:
+                            x_ocr = x
+                            w_ocr = min(width - x_ocr, w + BANNER_PAD)
+                        ocr_crop = img_bgr[y : y + h, x_ocr : x_ocr + w_ocr]
+                        hero_id, conf = ocr_hero_from_crop(ocr_crop, is_ally=is_ally)
+                        if hero_id and conf > 0.4:
+                            best_hero_id = hero_id
+                            best_score = conf
+                            print(
+                                f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
+                            )
+
+                    # Fallback to template matching if OCR didn't fire
+                    if best_hero_id is None and self.templates:
+                        gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                        resized_crop = cv2.resize(gray_crop, (100, 100))
+                        cl_crop = self.clahe.apply(resized_crop)
+                        for hero_id, variants in self.templates.items():
+                            for template in variants:
+                                if (
+                                    template.shape[0] > cl_crop.shape[0]
+                                    or template.shape[1] > cl_crop.shape[1]
+                                ):
+                                    continue
+                                res = cv2.matchTemplate(
+                                    cl_crop, template, cv2.TM_CCOEFF_NORMED
+                                )
+                                _, max_val, _, _ = cv2.minMaxLoc(res)
+                                if max_val > best_score:
+                                    best_score = max_val
+                                    best_hero_id = hero_id
+                        if best_score < 0.75:
+                            best_hero_id = None
+
+                else:
                     gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                     resized_crop = cv2.resize(gray_crop, (100, 100))
                     cl_crop = self.clahe.apply(resized_crop)
@@ -270,52 +315,34 @@ class VisionDetector(BaseDetector):
                     if best_score < 0.75:
                         best_hero_id = None
 
-            else:
-                gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                resized_crop = cv2.resize(gray_crop, (100, 100))
-                cl_crop = self.clahe.apply(resized_crop)
-                for hero_id, variants in self.templates.items():
-                    for template in variants:
-                        if (
-                            template.shape[0] > cl_crop.shape[0]
-                            or template.shape[1] > cl_crop.shape[1]
-                        ):
-                            continue
-                        res = cv2.matchTemplate(cl_crop, template, cv2.TM_CCOEFF_NORMED)
-                        _, max_val, _, _ = cv2.minMaxLoc(res)
-                        if max_val > best_score:
-                            best_score = max_val
-                            best_hero_id = hero_id
-                if best_score < 0.75:
-                    best_hero_id = None
-
-            if best_hero_id:
+                # Process stability tracking for this slot index
                 slot_key = f"{category}_{idx}"
-                current_candidate, count = self.detection_history.get(
-                    slot_key, (None, 0)
-                )
-
-                if current_candidate == best_hero_id:
-                    count += 1
-                else:
-                    current_candidate = best_hero_id
-                    count = 1
-
-                self.detection_history[slot_key] = (current_candidate, count)
-
-                if count >= 2:
-                    print(
-                        f"VisionDetector: Stably detected {best_hero_id} in {category}[{idx}] with score {best_score:.2f}"
+                if best_hero_id:
+                    current_candidate, count = self.detection_history.get(
+                        slot_key, (None, 0)
                     )
-                    success = self.draft_manager.apply_action(best_hero_id)
-                    self.detection_history.pop(slot_key, None)
-                    if success:
-                        self.on_match_callback()
+
+                    if current_candidate == best_hero_id:
+                        count += 1
                     else:
+                        current_candidate = best_hero_id
+                        count = 1
+
+                    self.detection_history[slot_key] = (current_candidate, count)
+
+                    if count >= 2:
                         print(
-                            f"VisionDetector: Attempted to apply '{best_hero_id}' in {category}[{idx}] but draft manager rejected it (already picked/banned or invalid step)."
+                            f"VisionDetector: Stably detected {best_hero_id} in {category}[{idx}] with score {best_score:.2f}"
                         )
-            else:
-                slot_key = f"{category}_{idx}"
-                if slot_key in self.detection_history:
-                    self.detection_history.pop(slot_key, None)
+                        success = self.draft_manager.apply_action(best_hero_id)
+                        self.detection_history.pop(slot_key, None)
+                        if success:
+                            self.on_match_callback()
+                            break  # Stop scanning other slots in this frame after successful match to allow step state to advance
+                        else:
+                            print(
+                                f"VisionDetector: Attempted to apply '{best_hero_id}' in {category}[{idx}] but draft manager rejected it (already picked/banned or invalid step)."
+                            )
+                else:
+                    if slot_key in self.detection_history:
+                        self.detection_history.pop(slot_key, None)
