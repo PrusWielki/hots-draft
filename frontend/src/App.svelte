@@ -381,15 +381,15 @@
         
         <!-- Filter Search Row -->
         <div class="flex flex-col md:flex-row gap-3">
-          <div class="flex-1 relative">
+          <label class="input input-bordered flex items-center gap-2 bg-gray-900 focus-within:input-primary w-full flex-1">
+            <span class="text-gray-500 text-sm">🔍</span>
             <input
               type="text"
               placeholder="Search hero..."
               bind:value={searchQuery}
-              class="input input-bordered w-full pl-10 bg-gray-900 text-white focus:input-primary"
+              class="grow bg-transparent border-none outline-none focus:ring-0 focus:outline-none text-white h-full"
             />
-            <span class="absolute left-3.5 top-3.5 text-gray-500 text-sm">🔍</span>
-          </div>
+          </label>
 
           <!-- Role Filter -->
           <select
