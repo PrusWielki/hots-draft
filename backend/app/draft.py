@@ -66,6 +66,15 @@ class DraftManager:
         if not step:
             return False
 
+        # Prevent duplicate picks or bans
+        if (
+            hero_id in self.my_team_picks
+            or hero_id in self.enemy_picks
+            or hero_id in self.my_team_bans
+            or hero_id in self.enemy_bans
+        ):
+            return False
+
         # Append to the correct list
         if step.action == "pick":
             if step.team == "my_team":

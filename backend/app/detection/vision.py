@@ -251,7 +251,7 @@ class VisionDetector(BaseDetector):
 
                 # Make a perfect square crop centered on the slot to avoid aspect ratio distortion during resizing
                 cx, cy = x + w // 2, y + h // 2
-                side = max(w, h)
+                side = min(w, h)
                 x_sq = max(0, cx - side // 2)
                 y_sq = max(0, cy - side // 2)
                 sq_side = min(width - x_sq, height - y_sq, side)
@@ -331,7 +331,20 @@ class VisionDetector(BaseDetector):
 
                 # Process stability tracking for this slot index
                 slot_key = f"{category}_{idx}"
-                if best_hero_id:
+
+                # Ignore already picked or banned heroes
+                is_already_taken = (
+                    (
+                        best_hero_id in self.draft_manager.my_team_picks
+                        or best_hero_id in self.draft_manager.enemy_picks
+                        or best_hero_id in self.draft_manager.my_team_bans
+                        or best_hero_id in self.draft_manager.enemy_bans
+                    )
+                    if best_hero_id
+                    else False
+                )
+
+                if best_hero_id and not is_already_taken:
                     current_candidate, count = self.detection_history.get(
                         slot_key, (None, 0)
                     )
