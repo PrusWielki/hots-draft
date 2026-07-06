@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING
+from app.detection.name_map import name_to_hero_id
 
 if TYPE_CHECKING:
     import numpy as np
@@ -23,7 +24,30 @@ try:
 except ImportError:
     EASYOCR_AVAILABLE = False
 
-from app.detection.name_map import name_to_hero_id
+try:
+    import pytesseract  # type: ignore[import-untyped]
+
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    PYTESSERACT_AVAILABLE = False
+
+_tesseract_usable: bool | None = None
+
+
+def _is_tesseract_usable() -> bool:
+    global _tesseract_usable
+    if _tesseract_usable is not None:
+        return _tesseract_usable
+    if not PYTESSERACT_AVAILABLE:
+        _tesseract_usable = False
+        return False
+    try:
+        pytesseract.get_tesseract_version()
+        _tesseract_usable = True
+    except Exception:
+        _tesseract_usable = False
+    return _tesseract_usable
+
 
 # EasyOCR reader is expensive to initialise; share a single instance.
 _reader: "easyocr.Reader | None" = None
@@ -83,11 +107,32 @@ def ocr_hero_from_crop(
 
     Returns (None, 0.0) if no confident match.
     """
+    name_region = extract_name_region(crop_bgr, is_ally=is_ally)
+
+    # 1. Try pytesseract first (ultra-fast, 10-30ms)
+    if _is_tesseract_usable():
+        try:
+            # Treat image as a single text line (PSM 7)
+            raw_text = pytesseract.image_to_string(
+                name_region, lang="pol+eng", config="--psm 7"
+            )
+            text_clean = raw_text.strip()
+            if text_clean:
+                hero_id = name_to_hero_id(text_clean)
+                if hero_id:
+                    if debug:
+                        print(
+                            f"  Tesseract OCR matched: '{hero_id}' (raw='{text_clean}')"
+                        )
+                    return hero_id, 0.90
+        except Exception as e:
+            if debug:
+                print(f"  Tesseract OCR failed: {e}. Falling back to EasyOCR.")
+
+    # 2. Fallback to EasyOCR
     reader = _get_reader()
     if reader is None:
         return None, 0.0
-
-    name_region = extract_name_region(crop_bgr, is_ally=is_ally)
 
     results = reader.readtext(
         name_region,

@@ -195,6 +195,92 @@ class VisionDetector(BaseDetector):
                 time.sleep(5.0)
             time.sleep(0.8)
 
+    def capture_active_slot_as_template(self, hero_id: str):
+        """Capture the screen region of the current active slot and save it as a template for hero_id."""
+        if not OPENCV_AVAILABLE or not self.templates:
+            return
+
+        step = self.draft_manager.get_current_step()
+        if not step:
+            return
+
+        category = None
+        if step.action == "pick":
+            category = "ally_picks" if step.team == "my_team" else "enemy_picks"
+        elif step.action == "ban":
+            category = "ally_bans" if step.team == "my_team" else "enemy_bans"
+
+        if not category:
+            return
+
+        active_indices = get_active_slots(
+            self.draft_manager.current_step_idx, step.action
+        )
+        if not active_indices:
+            return
+
+        idx = active_indices[0]
+        if idx >= len(self.coordinates[category]):
+            return
+
+        slot = self.coordinates[category][idx]
+
+        import mss
+        import numpy as np
+
+        try:
+            with mss.mss() as sct:
+                monitor = sct.monitors[1]
+                width = monitor["width"]
+                height = monitor["height"]
+
+                sct_img = sct.grab(monitor)
+                img_bgr = np.array(sct_img)
+                img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
+
+                scale_x = width / 2560.0
+                scale_y = height / 1440.0
+
+                x = int(slot["x"] * scale_x)
+                y = int(slot["y"] * scale_y)
+                w = int(slot["w"] * scale_x)
+                h = int(slot["h"] * scale_y)
+
+                if x < 0 or y < 0 or x + w > width or y + h > height:
+                    return
+
+                cx, cy = x + w // 2, y + h // 2
+                side = min(w, h)
+                x_sq = max(0, cx - side // 2)
+                y_sq = max(0, cy - side // 2)
+                sq_side = min(width - x_sq, height - y_sq, side)
+                square_crop = img_bgr[y_sq : y_sq + sq_side, x_sq : x_sq + sq_side]
+
+                if square_crop.size > 0:
+                    save_dir = Path("data/draft_templates")
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    save_path = save_dir / f"{hero_id}.png"
+
+                    cv2.imwrite(str(save_path), square_crop)
+                    print(
+                        f"VisionDetector: Dynamically captured and saved template for '{hero_id}' to {save_path}"
+                    )
+
+                    # Load template immediately into memory
+                    gray = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+                    scales = [0.85, 0.9, 0.95, 1.0, 1.05]
+                    variants = []
+                    for s in scales:
+                        target_w = int(100 * s)
+                        target_h = int(100 * s)
+                        resized = cv2.resize(gray, (target_w, target_h))
+                        clahe_img = self.clahe.apply(resized)
+                        variants.append(clahe_img)
+
+                    self.templates[hero_id] = variants
+        except Exception as e:
+            print(f"Error dynamically capturing template: {e}")
+
     def _match_templates(
         self, square_crop, match_top_only=False
     ) -> tuple[Optional[str], float]:

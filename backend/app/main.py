@@ -188,10 +188,17 @@ async def post_draft_event(event: DraftEvent):
             raise HTTPException(
                 status_code=400, detail="hero_id is required for pick/ban events"
             )
-        if event.hero_id not in HERO_DB:
+        if event.hero_id != "none" and event.hero_id not in HERO_DB:
             raise HTTPException(
                 status_code=400, detail=f"Unknown hero_id: {event.hero_id}"
             )
+
+        # Capture template for this slot dynamically before state advances
+        if VISION_DETECTOR and event.hero_id != "none":
+            try:
+                VISION_DETECTOR.capture_active_slot_as_template(event.hero_id)
+            except Exception as e:
+                logger.error(f"Failed to capture template dynamically: {e}")
 
         success = DRAFT_MANAGER.apply_action(event.hero_id)
         if not success:
