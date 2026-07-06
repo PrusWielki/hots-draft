@@ -103,5 +103,5 @@ def test_synergy_bonus():
     recs = score_heroes(state, MOCK_HERO_DB)
     rec_map = {r.hero_id: r for r in recs}
 
-    # Abathur synergies with Illidan -> 100 base + 15 (Abathur->Illidan) + 15 (Illidan->Abathur) = 130 pts
-    assert rec_map["abathur"].score == 130.0
+    # Abathur synergies with Illidan -> 100 base + 30 synergy - 10 Support penalty = 120 pts
+    assert rec_map["abathur"].score == 120.0

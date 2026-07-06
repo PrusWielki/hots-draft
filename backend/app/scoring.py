@@ -40,9 +40,11 @@ def score_heroes(
     ally_roles = [
         hero_db[h_id].role for h_id in draft_state.my_team_picks if h_id in hero_db
     ]
-    has_tank = HotsRole.TANK in ally_roles
-    has_healer = HotsRole.HEALER in ally_roles
-    has_bruiser = HotsRole.BRUISER in ally_roles
+    tanks = ally_roles.count(HotsRole.TANK)
+    healers = ally_roles.count(HotsRole.HEALER)
+    bruisers = ally_roles.count(HotsRole.BRUISER)
+    ranged_assassins = ally_roles.count(HotsRole.RANGED_ASSASSIN)
+    melee_assassins = ally_roles.count(HotsRole.MELEE_ASSASSIN)
 
     for hero_id, hero in hero_db.items():
         if hero_id in unavailable:
@@ -80,8 +82,9 @@ def score_heroes(
                 base_score -= 20.0
                 reasons.append(f"Countered by enemy {enemy.name} (-20 pts)")
 
+        # Composition and Role balancing
         if hero.role == HotsRole.TANK:
-            if not has_tank:
+            if tanks == 0:
                 base_score += 30.0
                 reasons.append("Missing primary Tank role (+30 pts)")
             else:
@@ -89,7 +92,7 @@ def score_heroes(
                 reasons.append("Tank role already filled (-15 pts)")
 
         elif hero.role == HotsRole.HEALER:
-            if not has_healer:
+            if healers == 0:
                 base_score += 35.0
                 reasons.append("Missing primary Healer role (+35 pts)")
             else:
@@ -97,9 +100,44 @@ def score_heroes(
                 reasons.append("Healer role already filled (-25 pts)")
 
         elif hero.role == HotsRole.BRUISER:
-            if not has_bruiser:
+            if bruisers == 0:
                 base_score += 15.0
                 reasons.append("Missing Bruiser/Offlaner role (+15 pts)")
+            else:
+                base_score -= 10.0
+                reasons.append("Bruiser role already filled (-10 pts)")
+
+        elif hero.role == HotsRole.RANGED_ASSASSIN:
+            if ranged_assassins == 0:
+                base_score += 20.0
+                reasons.append("Missing Ranged damage dealer (+20 pts)")
+            elif ranged_assassins >= 2:
+                base_score -= 10.0
+                reasons.append("Sufficient Ranged damage already present (-10 pts)")
+
+        # Penalize extra squishies if frontline/healing is missing, or if we have too many assassins
+        if hero.role in (HotsRole.RANGED_ASSASSIN, HotsRole.MELEE_ASSASSIN):
+            assassins_count = ranged_assassins + melee_assassins
+            if assassins_count >= 2:
+                if tanks == 0 or healers == 0:
+                    base_score -= 15.0
+                    reasons.append("Need Tank/Healer before more Assassins (-15 pts)")
+                elif assassins_count >= 3:
+                    base_score -= 20.0
+                    reasons.append("Too many squishy damage dealers (-20 pts)")
+
+        # Support role synergy/comp checks
+        elif hero.role == HotsRole.SUPPORT:
+            has_hypercarry = any(
+                h in ("illidan", "valla", "tracer", "zeratul")
+                for h in draft_state.my_team_picks
+            )
+            if has_hypercarry and tanks >= 1 and healers >= 1:
+                base_score += 15.0
+                reasons.append("Enabler Support for hypercarry (+15 pts)")
+            else:
+                base_score -= 10.0
+                reasons.append("Support role not prioritized (-10 pts)")
 
         tier_adjustments = {"S": 12.0, "A": 6.0, "B": 0.0, "C": -6.0, "D": -12.0}
         tier_adj = tier_adjustments.get(hero.tier, 0.0)

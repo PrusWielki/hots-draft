@@ -72,6 +72,7 @@
   let socket = null;
   let wsStatus = $state("connecting");
   let backendUrl = $state("");
+  let assetsUrl = $derived(wsStatus === "connected" ? backendUrl : ".");
 
   // Determine backend and websocket locations
   onMount(async () => {
@@ -90,14 +91,39 @@
     };
   });
 
+  // Standalone/Local Draft Simulation State
+  let winRates = {};
+  let currentStepIdx = $state(0);
+  let localHistory = $state([]); // array of { stepIdx, heroId }
+
   async function fetchHeroes() {
     try {
       const res = await fetch(`${backendUrl}/api/heroes`);
       if (res.ok) {
         heroes = await res.json();
+      } else {
+        await fetchLocalData();
       }
     } catch (e) {
-      console.error("Failed to fetch heroes: ", e);
+      console.warn("FastAPI fetch failed, falling back to local files:", e);
+      await fetchLocalData();
+    }
+  }
+
+  async function fetchLocalData() {
+    try {
+      const resHeroes = await fetch("./data/heroes.json");
+      if (resHeroes.ok) {
+        heroes = await resHeroes.json();
+      }
+      const resWR = await fetch("./data/win_rates.json");
+      if (resWR.ok) {
+        winRates = await resWR.json();
+      }
+      // Initialize local step definitions
+      runLocalScoring();
+    } catch (e) {
+      console.error("Local data load failed:", e);
     }
   }
 
@@ -139,22 +165,341 @@
     };
   }
 
-  // Trigger state transitions via HTTP/WS
-  function sendEvent(eventType, details = {}) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not ready.");
-      return;
+  function getDraftSteps(myTeamFirst) {
+    const t1 = myTeamFirst ? "my_team" : "enemy";
+    const t2 = myTeamFirst ? "enemy" : "my_team";
+    return [
+      { action: "ban", team: t1 },
+      { action: "ban", team: t2 },
+      { action: "ban", team: t1 },
+      { action: "ban", team: t2 },
+      { action: "pick", team: t1 },
+      { action: "pick", team: t2 },
+      { action: "pick", team: t2 },
+      { action: "pick", team: t1 },
+      { action: "pick", team: t1 },
+      { action: "ban", team: t2 },
+      { action: "ban", team: t1 },
+      { action: "pick", team: t2 },
+      { action: "pick", team: t1 },
+      { action: "pick", team: t1 },
+      { action: "pick", team: t2 },
+      { action: "pick", team: t2 }
+    ];
+  }
+
+  function handleLocalEvent(action, details) {
+    if (action === "pick" || action === "ban") {
+      applyLocalAction(details.hero_id);
+    } else if (action === "map_select") {
+      draftState.map_name = details.map_name;
+      runLocalScoring();
+    } else if (action === "set_first_pick") {
+      draftState.my_team_first = details.my_team_first;
+      resetLocalDraft();
+    } else if (action === "reset") {
+      resetLocalDraft();
+    } else if (action === "undo") {
+      undoLocalAction();
     }
-    const payload = { event_type: eventType, ...details };
-    socket.send(JSON.stringify(payload));
+  }
+
+  function applyLocalAction(heroId) {
+    const steps = getDraftSteps(draftState.my_team_first);
+    if (currentStepIdx >= steps.length) return;
+    const step = steps[currentStepIdx];
+    
+    if (step.action === "pick") {
+      if (step.team === "my_team") {
+        draftState.my_team_picks = [...draftState.my_team_picks, heroId];
+      } else {
+        draftState.enemy_picks = [...draftState.enemy_picks, heroId];
+      }
+    } else {
+      if (step.team === "my_team") {
+        draftState.my_team_bans = [...draftState.my_team_bans, heroId];
+      } else {
+        draftState.enemy_bans = [...draftState.enemy_bans, heroId];
+      }
+    }
+    localHistory = [...localHistory, { stepIdx: currentStepIdx, heroId }];
+    currentStepIdx++;
+    runLocalScoring();
+  }
+
+  function undoLocalAction() {
+    if (localHistory.length === 0) return;
+    const last = localHistory[localHistory.length - 1];
+    localHistory = localHistory.slice(0, -1);
+    currentStepIdx = last.stepIdx;
+    
+    draftState.my_team_picks = [];
+    draftState.my_team_bans = [];
+    draftState.enemy_picks = [];
+    draftState.enemy_bans = [];
+    
+    const steps = getDraftSteps(draftState.my_team_first);
+    localHistory.forEach(item => {
+      const step = steps[item.stepIdx];
+      if (step.action === "pick") {
+        if (step.team === "my_team") draftState.my_team_picks = [...draftState.my_team_picks, item.heroId];
+        else draftState.enemy_picks = [...draftState.enemy_picks, item.heroId];
+      } else {
+        if (step.team === "my_team") draftState.my_team_bans = [...draftState.my_team_bans, item.heroId];
+        else draftState.enemy_bans = [...draftState.enemy_bans, item.heroId];
+      }
+    });
+    runLocalScoring();
+  }
+
+  function resetLocalDraft() {
+    draftState.my_team_picks = [];
+    draftState.my_team_bans = [];
+    draftState.enemy_picks = [];
+    draftState.enemy_bans = [];
+    localHistory = [];
+    currentStepIdx = 0;
+    runLocalScoring();
+  }
+
+  function runLocalScoring() {
+    const stepsList = getDraftSteps(draftState.my_team_first);
+    draftState.current_step = currentStepIdx < stepsList.length ? {
+      action: stepsList[currentStepIdx].action,
+      team: stepsList[currentStepIdx].team,
+      index: currentStepIdx
+    } : null;
+    draftState.is_complete = currentStepIdx >= stepsList.length;
+
+    const unavailable = new Set([
+      ...draftState.my_team_picks,
+      ...draftState.my_team_bans,
+      ...draftState.enemy_picks,
+      ...draftState.enemy_bans
+    ]);
+
+    const allyRoles = draftState.my_team_picks.map(h_id => {
+      const h = heroes.find(x => x.id === h_id);
+      return h ? h.role : "";
+    });
+
+    const tanks = allyRoles.filter(r => r === "Tank").length;
+    const healers = allyRoles.filter(r => r === "Healer").length;
+    const bruisers = allyRoles.filter(r => r === "Bruiser").length;
+    const rangedAssassins = allyRoles.filter(r => r === "Ranged Assassin").length;
+    const meleeAssassins = allyRoles.filter(r => r === "Melee Assassin").length;
+    const supports = allyRoles.filter(r => r === "Support").length;
+
+    // Local Picks scoring
+    const pickRecs = heroes
+      .filter(hero => !unavailable.has(hero.id))
+      .map(hero => {
+        let score = 100.0;
+        let reasons = [];
+
+        draftState.my_team_picks.forEach(allyId => {
+          const ally = heroes.find(x => x.id === allyId);
+          if (!ally) return;
+          let synergyBonus = 0.0;
+          if (hero.synergies.includes(allyId)) synergyBonus += 15.0;
+          if (ally.synergies.includes(hero.id)) synergyBonus += 15.0;
+          if (synergyBonus > 0) {
+            score += synergyBonus;
+            reasons.push(`Synergy with ally ${ally.name} (+${synergyBonus.toFixed(0)} pts)`);
+          }
+        });
+
+        draftState.enemy_picks.forEach(enemyId => {
+          const enemy = heroes.find(x => x.id === enemyId);
+          if (!enemy) return;
+          if (hero.counters.includes(enemyId)) {
+            score += 25.0;
+            reasons.push(`Counters enemy ${enemy.name} (+25 pts)`);
+          }
+          if (enemy.counters.includes(hero.id)) {
+            score -= 20.0;
+            reasons.push(`Countered by enemy ${enemy.name} (-20 pts)`);
+          }
+        });
+
+        if (hero.role === "Tank") {
+          if (tanks === 0) {
+            score += 30.0;
+            reasons.push("Missing primary Tank role (+30 pts)");
+          } else {
+            score -= 15.0;
+            reasons.push("Tank role already filled (-15 pts)");
+          }
+        } else if (hero.role === "Healer") {
+          if (healers === 0) {
+            score += 35.0;
+            reasons.push("Missing primary Healer role (+35 pts)");
+          } else {
+            score -= 25.0;
+            reasons.push("Healer role already filled (-25 pts)");
+          }
+        } else if (hero.role === "Bruiser") {
+          if (bruisers === 0) {
+            score += 15.0;
+            reasons.push("Missing Bruiser/Offlaner role (+15 pts)");
+          } else {
+            score -= 10.0;
+            reasons.push("Bruiser role already filled (-10 pts)");
+          }
+        } else if (hero.role === "Ranged Assassin") {
+          if (rangedAssassins === 0) {
+            score += 20.0;
+            reasons.push("Missing Ranged damage dealer (+20 pts)");
+          } else if (rangedAssassins >= 2) {
+            score -= 10.0;
+            reasons.push("Sufficient Ranged damage already present (-10 pts)");
+          }
+        }
+
+        if (hero.role === "Ranged Assassin" || hero.role === "Melee Assassin") {
+          const assCount = rangedAssassins + meleeAssassins;
+          if (assCount >= 2) {
+            if (tanks === 0 || healers === 0) {
+              score -= 15.0;
+              reasons.push("Need Tank/Healer before more Assassins (-15 pts)");
+            } else if (assCount >= 3) {
+              score -= 20.0;
+              reasons.push("Too many squishy damage dealers (-20 pts)");
+            }
+          }
+        } else if (hero.role === "Support") {
+          const hasHypercarry = draftState.my_team_picks.some(id => ["illidan", "valla", "tracer", "zeratul"].includes(id));
+          if (hasHypercarry && tanks >= 1 && healers >= 1) {
+            score += 15.0;
+            reasons.push("Enabler Support for hypercarry (+15 pts)");
+          } else {
+            score -= 10.0;
+            reasons.push("Support role not prioritized (-10 pts)");
+          }
+        }
+
+        const tierWeights = { S: 12.0, A: 6.0, B: 0.0, C: -6.0, D: -12.0 };
+        const tierScore = tierWeights[hero.tier] || 0.0;
+        if (tierScore !== 0.0) {
+          score += tierScore;
+          reasons.push(`${hero.tier}-Tier classification (${tierScore >= 0 ? "+" : ""}${tierScore.toFixed(0)} pts)`);
+        }
+
+        const stats = winRates[hero.id];
+        if (stats) {
+          const wr = stats.win_rate || 50.0;
+          const wrAdj = (wr - 50.0) * 2.0;
+          if (wrAdj !== 0.0) {
+            score += wrAdj;
+            reasons.push(`Global Win Rate of ${wr.toFixed(1)}% (${wrAdj >= 0 ? "+" : ""}${wrAdj.toFixed(1)} pts)`);
+          }
+        }
+
+        if (draftState.map_name && hero.map_performance) {
+          const mapMod = hero.map_performance[draftState.map_name];
+          if (mapMod) {
+            const oldScore = score;
+            score *= mapMod;
+            const diff = score - oldScore;
+            reasons.push(`Map modifier for '${draftState.map_name}' (${diff >= 0 ? "+" : ""}${diff.toFixed(1)} pts)`);
+          }
+        }
+
+        return { hero_id: hero.id, score: Math.round(score * 10) / 10, reasons };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // Local Bans scoring
+    const banRecs = heroes
+      .filter(hero => !unavailable.has(hero.id))
+      .map(hero => {
+        let score = 0.0;
+        let reasons = [];
+
+        const tierWeights = { S: 15.0, A: 8.0, B: 2.0, C: -5.0, D: -10.0 };
+        const tierScore = tierWeights[hero.tier] || 0.0;
+        if (tierScore !== 0.0) {
+          score += tierScore;
+          reasons.push(`${hero.tier}-Tier meta power (${tierScore >= 0 ? "+" : ""}${tierScore.toFixed(0)} pts)`);
+        }
+
+        if (hero.recommended_ban) {
+          score += 25.0;
+          reasons.push("High meta ban priority (+25 pts)");
+        }
+
+        const stats = winRates[hero.id];
+        if (stats) {
+          const wr = stats.win_rate || 50.0;
+          const br = stats.ban_rate || 0.0;
+          const wrFactor = Math.max(0.0, wr - 50.0) * 1.5;
+          const brFactor = br * 0.3;
+          const banAdj = wrFactor + brFactor;
+          if (banAdj > 0.0) {
+            score += banAdj;
+            reasons.push(`Meta presence (WR ${wr.toFixed(1)}%, Ban ${br.toFixed(1)}%) (+${banAdj.toFixed(1)} pts)`);
+          }
+        }
+
+        draftState.my_team_picks.forEach(allyId => {
+          if (hero.counters.includes(allyId)) {
+            score += 25.0;
+            reasons.push(`Hard counters our ${getHero(allyId).name} (+25 pts)`);
+          }
+        });
+
+        draftState.enemy_picks.forEach(enemyId => {
+          const enemy = heroes.find(x => x.id === enemyId);
+          if (!enemy) return;
+          if (enemy.synergies.includes(hero.id) || hero.synergies.includes(enemyId)) {
+            score += 15.0;
+            reasons.push(`Synergizes with enemy ${enemy.name} (+15 pts)`);
+          }
+        });
+
+        if (draftState.map_name && hero.map_performance) {
+          const mapMod = hero.map_performance[draftState.map_name];
+          if (mapMod) {
+            if (mapMod > 1.0) {
+              score += 12.0;
+              reasons.push(`Strong on '${draftState.map_name}' (+12 pts)`);
+            } else if (mapMod < 1.0) {
+              score -= 10.0;
+              reasons.push(`Weak on '${draftState.map_name}' (-10 pts)`);
+            }
+          }
+        }
+
+        draftState.enemy_picks.forEach(enemyId => {
+          if (hero.counters.includes(enemyId)) {
+            score -= 15.0;
+            reasons.push(`Counters enemy ${getHero(enemyId).name} (keep open to pick) (-15 pts)`);
+          }
+        });
+
+        return { hero_id: hero.id, score: Math.round(score * 10) / 10, reasons };
+      })
+      .filter(r => r.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    recommendations = pickRecs;
+    banRecommendations = banRecs;
+  }
+
+  // Unified event router
+  function sendEvent(eventType, details = {}) {
+    if (wsStatus === "connected" && socket && socket.readyState === WebSocket.OPEN) {
+      const payload = { event_type: eventType, ...details };
+      socket.send(JSON.stringify(payload));
+    } else {
+      handleLocalEvent(eventType, details);
+    }
   }
 
   function selectHero(heroId) {
     if (draftState.is_complete) return;
-    
     const step = draftState.current_step;
     if (!step) return;
-
     sendEvent(step.action, { hero_id: heroId });
   }
 
@@ -171,14 +516,19 @@
   }
 
   async function reloadDB() {
-    try {
-      const res = await fetch(`${backendUrl}/api/db/reload`, { method: "POST" });
-      if (res.ok) {
-        await fetchHeroes();
-        alert("Heroes database reloaded successfully!");
+    if (wsStatus === "connected") {
+      try {
+        const res = await fetch(`${backendUrl}/api/db/reload`, { method: "POST" });
+        if (res.ok) {
+          await fetchHeroes();
+          alert("Heroes database reloaded successfully!");
+        }
+      } catch (e) {
+        alert("Failed to reload DB: " + e.message);
       }
-    } catch (e) {
-      alert("Failed to reload DB: " + e.message);
+    } else {
+      await fetchLocalData();
+      alert("Local database reloaded successfully!");
     }
   }
 
@@ -326,7 +676,7 @@
                 {@const hero = getHero(heroId)}
                 <div class="relative h-12 w-12 rounded bg-gray-800 overflow-hidden border border-cyan-500/30">
                   <img
-                    src="{backendUrl}/data/portraits/{heroId}.png"
+                    src="{assetsUrl}/data/portraits/{heroId}.png"
                     alt={hero.name}
                     class="h-full w-full object-cover"
                     onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
@@ -366,7 +716,7 @@
                 {#if heroId}
                   {@const hero = getHero(heroId)}
                   <img
-                    src="{backendUrl}/data/portraits/{heroId}.png"
+                    src="{assetsUrl}/data/portraits/{heroId}.png"
                     alt={hero.name}
                     class="h-full w-full object-cover opacity-60 grayscale"
                     onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
@@ -464,7 +814,7 @@
                 >
                   <div class="aspect-square w-full rounded bg-gray-850 overflow-hidden relative border {hero.recommended_ban ? 'border-red-650 ring-1 ring-red-600/40' : 'border-gray-800'} group-hover:border-purple-500/30">
                     <img
-                      src="{backendUrl}/data/portraits/{hero.id}.png"
+                      src="{assetsUrl}/data/portraits/{hero.id}.png"
                       alt={hero.name}
                       class="h-full w-full object-cover group-hover:scale-105 transition"
                       onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
@@ -576,7 +926,7 @@
                     <!-- Portrait -->
                     <div class="relative h-10 w-10 rounded bg-gray-850 overflow-hidden border {activeRecTab === 'picks' ? 'border-purple-500/20' : 'border-red-500/20'}">
                       <img
-                        src="{backendUrl}/data/portraits/{rec.hero_id}.png"
+                        src="{assetsUrl}/data/portraits/{rec.hero_id}.png"
                         alt={hero.name}
                         class="h-full w-full object-cover"
                         onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
@@ -644,7 +994,7 @@
             <div class="flex items-center gap-2">
               <div class="relative h-9 w-9 rounded bg-gray-850 overflow-hidden border border-purple-500/20">
                 <img
-                  src="{backendUrl}/data/portraits/{inspectedHero.id}.png"
+                  src="{assetsUrl}/data/portraits/{inspectedHero.id}.png"
                   alt={inspectedHero.name}
                   class="h-full w-full object-cover"
                 />
@@ -757,7 +1107,7 @@
                     {#each inspectedHero.synergies.slice(0, 4) as synId}
                       {@const synHero = getHero(synId)}
                       <div role="presentation" class="group/syn relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer animate-fade-in" onmouseenter={() => inspectedHeroId = synId}>
-                        <img src="{backendUrl}/data/portraits/{synId}.png" alt={synHero.name} class="h-full w-full object-cover" />
+                        <img src="{assetsUrl}/data/portraits/{synId}.png" alt={synHero.name} class="h-full w-full object-cover" />
                         <div class="absolute bottom-full mb-1 hidden group-hover/syn:block bg-gray-900 border border-gray-700 text-white text-[9px] py-1 px-1.5 rounded shadow-xl whitespace-nowrap z-50">
                           {synHero.name}
                         </div>
@@ -777,7 +1127,7 @@
                     {#each inspectedHero.counters.slice(0, 4) as cntId}
                       {@const cntHero = getHero(cntId)}
                       <div role="presentation" class="group/cnt relative h-5 w-5 rounded bg-gray-900 border border-gray-800 overflow-hidden cursor-pointer" onmouseenter={() => inspectedHeroId = cntId}>
-                        <img src="{backendUrl}/data/portraits/{cntId}.png" alt={cntHero.name} class="h-full w-full object-cover" />
+                        <img src="{assetsUrl}/data/portraits/{cntId}.png" alt={cntHero.name} class="h-full w-full object-cover" />
                         <div class="absolute bottom-full mb-1 hidden group-hover/cnt:block bg-gray-900 border border-gray-700 text-white text-[9px] py-1 px-1.5 rounded shadow-xl whitespace-nowrap z-50">
                           {cntHero.name}
                         </div>
@@ -816,7 +1166,7 @@
             {@const hero = getHero(heroId)}
             <div class="relative h-12 w-12 rounded bg-gray-800 overflow-hidden border border-rose-500/30">
               <img
-                src="{backendUrl}/data/portraits/{heroId}.png"
+                src="{assetsUrl}/data/portraits/{heroId}.png"
                 alt={hero.name}
                 class="h-full w-full object-cover"
                 onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
@@ -856,7 +1206,7 @@
             {#if heroId}
               {@const hero = getHero(heroId)}
               <img
-                src="{backendUrl}/data/portraits/{heroId}.png"
+                src="{assetsUrl}/data/portraits/{heroId}.png"
                 alt={hero.name}
                 class="h-full w-full object-cover opacity-60 grayscale"
                 onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
