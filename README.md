@@ -7,7 +7,8 @@ A desktop draft helper for Heroes of the Storm that reads screen data (via OpenC
 ### 1. Start Python Backend
 ```bash
 cd backend
-uv run uvicorn app.main:app --host 0.0.0.0 --reload
+# Note: Do NOT use --reload on Windows during draft/play, as Torch/EasyOCR touching files triggers uvicorn reload loops.
+uv run uvicorn app.main:app --host 0.0.0.0
 ```
 
 ### 2. Start Svelte Frontend

@@ -234,6 +234,16 @@ class VisionDetector(BaseDetector):
                 if crop.size == 0:
                     continue
 
+                # Make a perfect square crop centered on the slot to avoid aspect ratio distortion during resizing
+                cx, cy = x + w // 2, y + h // 2
+                side = max(w, h)
+                x_sq = max(0, cx - side // 2)
+                y_sq = max(0, cy - side // 2)
+                sq_side = min(width - x_sq, height - y_sq, side)
+                square_crop = img_bgr[y_sq : y_sq + sq_side, x_sq : x_sq + sq_side]
+                if square_crop.size == 0:
+                    square_crop = crop
+
                 best_hero_id: Optional[str] = None
                 best_score = 0.0
 
@@ -263,7 +273,7 @@ class VisionDetector(BaseDetector):
 
                     # Fallback to template matching if OCR didn't fire
                     if best_hero_id is None and self.templates:
-                        gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                        gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
                         resized_crop = cv2.resize(gray_crop, (100, 100))
                         cl_crop = self.clahe.apply(resized_crop)
                         for hero_id, variants in self.templates.items():
@@ -284,7 +294,7 @@ class VisionDetector(BaseDetector):
                             best_hero_id = None
 
                 else:
-                    gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                    gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
                     resized_crop = cv2.resize(gray_crop, (100, 100))
                     cl_crop = self.clahe.apply(resized_crop)
                     for hero_id, variants in self.templates.items():

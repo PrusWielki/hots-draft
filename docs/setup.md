@@ -27,7 +27,8 @@ The backend runs a FastAPI server. To set up and launch it:
     ```
 3.  Start the FastAPI application:
     ```bash
-    uv run uvicorn app.main:app --host 0.0.0.0 --reload
+    # Note: Do NOT use --reload on Windows during draft/play, as Torch/EasyOCR touching files triggers uvicorn reload loops.
+    uv run uvicorn app.main:app --host 0.0.0.0
     ```
     The server will be available at `http://localhost:8000` (and accessible externally via your PC's IP).
 
