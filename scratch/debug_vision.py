@@ -60,8 +60,8 @@ def debug_capture():
         )
 
         height, width = img_bgr.shape[:2]
-        scale_x = width / 1920.0
-        scale_y = height / 1080.0
+        scale_x = width / 2560.0
+        scale_y = height / 1440.0
 
         print(
             f"Capture dimensions: {width}x{height} (Scale factors: X={scale_x:.2f}, Y={scale_y:.2f})"
