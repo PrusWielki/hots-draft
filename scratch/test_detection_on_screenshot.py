@@ -103,7 +103,12 @@ for step_idx in range(16):
 
             best_hero = None
             best_score = 0.0
-            for hero_id, variants in detector.templates.items():
+            templates_dict = (
+                detector.pick_templates
+                if step.action == "pick"
+                else detector.ban_templates
+            )
+            for hero_id, variants in templates_dict.items():
                 for template in variants:
                     if (
                         template.shape[0] > cl_crop.shape[0]
@@ -138,7 +143,11 @@ for step_idx in range(16):
                     resized_crop_try = cv2.resize(gray_crop_try, (100, 100))
                     cl_crop_try = detector.clahe.apply(resized_crop_try)
 
-                    for template in detector.templates.get("rehgar", []):
+                    for template in (
+                        detector.pick_templates
+                        if step.action == "pick"
+                        else detector.ban_templates
+                    ).get("rehgar", []):
                         if (
                             template.shape[0] > cl_crop_try.shape[0]
                             or template.shape[1] > cl_crop_try.shape[1]

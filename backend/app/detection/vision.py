@@ -67,7 +67,8 @@ class VisionDetector(BaseDetector):
         self.on_match_callback = on_match_callback
         self.running = False
         self._thread: Optional[threading.Thread] = None
-        self.templates: Dict[str, Any] = {}
+        self.pick_templates: Dict[str, Any] = {}
+        self.ban_templates: Dict[str, Any] = {}
         self.coordinates = DEFAULT_COORDINATES
         self.detection_history: Dict[str, tuple[str, int]] = {}
         self.cooldown_until = 0.0
@@ -84,80 +85,71 @@ class VisionDetector(BaseDetector):
     def _load_templates(self):
         """Load portrait templates for OpenCV matching.
 
-        Prefers real draft crops when available and pre-generates scaled
-        variants to handle size differences.
+        Separates templates into picks and bans, using clean portraits as fallback.
         """
         portraits_dir = self.portraits_dir
         draft_dir = self.portraits_dir.parent / "draft_templates"
+        picks_dir = draft_dir / "picks"
+        bans_dir = draft_dir / "bans"
 
         scales = [0.5, 0.6, 0.7, 0.8, 0.9]
         border = 0.15
+
+        def load_variants(src_path, is_draft=False):
+            img = cv2.imread(str(src_path))
+            if img is None:
+                return None
+            if is_draft:
+                h, w = img.shape[:2]
+                cx, cy = w // 2, h // 2
+                side = min(w, h)
+                img = img[
+                    cy - side // 2 : cy - side // 2 + side,
+                    cx - side // 2 : cx - side // 2 + side,
+                ]
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            if is_draft:
+                h, w = gray.shape
+                b_h, b_w = int(h * border), int(w * border)
+                gray = gray[b_h : h - b_h, b_w : w - b_w]
+            base = cv2.resize(gray, (100, 100))
+            return [
+                self.clahe.apply(cv2.resize(base, (int(100 * s), int(100 * s))))
+                for s in scales
+            ]
+
+        # 1. Load clean portraits as baseline for both picks and bans
         for file in portraits_dir.iterdir():
             if file.suffix not in (".png", ".jpg", ".jpeg") or file.stem == ".gitkeep":
                 continue
-            draft_file = draft_dir / file.name
-            is_draft = draft_file.exists()
-            src = draft_file if is_draft else file
-            img = cv2.imread(str(src))
-            if img is not None:
-                if is_draft:
-                    h, w = img.shape[:2]
-                    cx, cy = w // 2, h // 2
-                    side = min(w, h)
-                    img = img[
-                        cy - side // 2 : cy - side // 2 + side,
-                        cx - side // 2 : cx - side // 2 + side,
-                    ]
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                if is_draft:
-                    h, w = gray.shape
-                    b_h, b_w = int(h * border), int(w * border)
-                    gray = gray[b_h : h - b_h, b_w : w - b_w]
-                base = cv2.resize(gray, (100, 100))
-                variants = []
-                for s in scales:
-                    w_s = int(100 * s)
-                    h_s = int(100 * s)
-                    scaled = cv2.resize(base, (w_s, h_s))
-                    cl = self.clahe.apply(scaled)
-                    variants.append(cl)
-                self.templates[file.stem] = variants
+            variants = load_variants(file, is_draft=False)
+            if variants:
+                self.pick_templates[file.stem] = variants
+                self.ban_templates[file.stem] = variants
 
-        if draft_dir.exists():
-            for file in draft_dir.iterdir():
-                if (
-                    file.suffix in (".png", ".jpg", ".jpeg")
-                    and file.stem not in self.templates
-                ):
-                    img = cv2.imread(str(file))
-                    if img is not None:
-                        h, w = img.shape[:2]
-                        cx, cy = w // 2, h // 2
-                        side = min(w, h)
-                        img = img[
-                            cy - side // 2 : cy - side // 2 + side,
-                            cx - side // 2 : cx - side // 2 + side,
-                        ]
-                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                        h, w = gray.shape
-                        b_h, b_w = int(h * border), int(w * border)
-                        gray = gray[b_h : h - b_h, b_w : w - b_w]
-                        base = cv2.resize(gray, (100, 100))
-                        self.templates[file.stem] = [
-                            self.clahe.apply(
-                                cv2.resize(base, (int(100 * s), int(100 * s)))
-                            )
-                            for s in scales
-                        ]
+        # 2. Overwrite with specific pick draft templates if present
+        picks_count = 0
+        if picks_dir.exists():
+            for file in picks_dir.iterdir():
+                if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
+                    variants = load_variants(file, is_draft=True)
+                    if variants:
+                        self.pick_templates[file.stem] = variants
+                        picks_count += 1
 
-        draft_count = (
-            sum(1 for f in portraits_dir.iterdir() if (draft_dir / f.name).exists())
-            if draft_dir.exists()
-            else 0
-        )
+        # 3. Overwrite with specific ban draft templates if present
+        bans_count = 0
+        if bans_dir.exists():
+            for file in bans_dir.iterdir():
+                if file.suffix in (".png", ".jpg", ".jpeg") and file.stem != ".gitkeep":
+                    variants = load_variants(file, is_draft=True)
+                    if variants:
+                        self.ban_templates[file.stem] = variants
+                        bans_count += 1
+
         print(
-            f"Loaded {len(self.templates)} portrait templates "
-            f"({draft_count} using real draft crops, {len(scales)} scales each)."
+            f"Loaded templates: {len(self.pick_templates)} picks ({picks_count} draft crops), "
+            f"{len(self.ban_templates)} bans ({bans_count} draft crops)."
         )
 
     def start(self):
@@ -186,7 +178,7 @@ class VisionDetector(BaseDetector):
                     time.sleep(0.5)
                     continue
 
-                if OPENCV_AVAILABLE and self.templates:
+                if OPENCV_AVAILABLE and (self.pick_templates or self.ban_templates):
                     self._perform_detection()
                 else:
                     time.sleep(2.0)
@@ -197,7 +189,7 @@ class VisionDetector(BaseDetector):
 
     def capture_active_slot_as_template(self, hero_id: str):
         """Capture the screen region of the current active slot and save it as a template for hero_id."""
-        if not OPENCV_AVAILABLE or not self.templates:
+        if not OPENCV_AVAILABLE or not (self.pick_templates or self.ban_templates):
             return
 
         step = self.draft_manager.get_current_step()
@@ -257,13 +249,14 @@ class VisionDetector(BaseDetector):
                 square_crop = img_bgr[y_sq : y_sq + sq_side, x_sq : x_sq + sq_side]
 
                 if square_crop.size > 0:
-                    save_dir = Path("data/draft_templates")
+                    subfolder = "picks" if step.action == "pick" else "bans"
+                    save_dir = Path("data/draft_templates") / subfolder
                     save_dir.mkdir(parents=True, exist_ok=True)
                     save_path = save_dir / f"{hero_id}.png"
 
                     cv2.imwrite(str(save_path), square_crop)
                     print(
-                        f"VisionDetector: Dynamically captured and saved template for '{hero_id}' to {save_path}"
+                        f"VisionDetector: Dynamically captured and saved {step.action} template for '{hero_id}' to {save_path}"
                     )
 
                     # Load template immediately into memory
@@ -277,14 +270,18 @@ class VisionDetector(BaseDetector):
                         clahe_img = self.clahe.apply(resized)
                         variants.append(clahe_img)
 
-                    self.templates[hero_id] = variants
+                    if step.action == "pick":
+                        self.pick_templates[hero_id] = variants
+                    else:
+                        self.ban_templates[hero_id] = variants
         except Exception as e:
             print(f"Error dynamically capturing template: {e}")
 
     def _match_templates(
-        self, square_crop, match_top_only=False
+        self, square_crop, action: str, match_top_only=False
     ) -> tuple[Optional[str], float]:
-        if not self.templates:
+        templates_dict = self.pick_templates if action == "pick" else self.ban_templates
+        if not templates_dict:
             return None, 0.0
 
         gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
@@ -298,7 +295,7 @@ class VisionDetector(BaseDetector):
         best_hero_id = None
         best_score = 0.0
 
-        for hero_id, variants in self.templates.items():
+        for hero_id, variants in templates_dict.items():
             for template in variants:
                 t_temp = template
                 if match_top_only:
@@ -387,7 +384,7 @@ class VisionDetector(BaseDetector):
 
                 if step.action == "pick":
                     # 1. Fast template matching first (bypass slow OCR if we have high-confidence match)
-                    t_hero, t_score = self._match_templates(square_crop)
+                    t_hero, t_score = self._match_templates(square_crop, action="pick")
                     if t_hero and t_score >= 0.85:
                         best_hero_id = t_hero
                         best_score = t_score
@@ -426,14 +423,14 @@ class VisionDetector(BaseDetector):
 
                 else:  # ban step
                     # 1. Try full template matching
-                    t_hero, t_score = self._match_templates(square_crop)
+                    t_hero, t_score = self._match_templates(square_crop, action="ban")
                     if t_hero and t_score >= 0.75:
                         best_hero_id = t_hero
                         best_score = t_score
                     else:
                         # 2. Try top-half-only template matching to bypass the red/blue ban overlay bar
                         t_hero, t_score = self._match_templates(
-                            square_crop, match_top_only=True
+                            square_crop, action="ban", match_top_only=True
                         )
                         if t_hero and t_score >= 0.70:
                             best_hero_id = t_hero
