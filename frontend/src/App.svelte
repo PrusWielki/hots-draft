@@ -72,10 +72,21 @@
   let socket = null;
   let wsStatus = $state("connecting");
   let backendUrl = $state("");
-  let assetsUrl = $derived(wsStatus === "connected" ? backendUrl : ".");
+  let basePath = $state("");
+  let assetsUrl = $derived(wsStatus === "connected" ? backendUrl : basePath);
 
   // Determine backend and websocket locations
   onMount(async () => {
+    // Dynamically calculate the base path (e.g. "/hots-draft" or "")
+    let path = window.location.pathname;
+    if (path.endsWith("index.html")) {
+      path = path.slice(0, -10);
+    }
+    if (!path.endsWith("/")) {
+      path += "/";
+    }
+    basePath = path.slice(0, -1); // Remove trailing slash for asset URLs
+
     const host = window.location.hostname;
     const httpPort = "8000";
     backendUrl = `http://${host}:${httpPort}`;
@@ -112,11 +123,11 @@
 
   async function fetchLocalData() {
     try {
-      const resHeroes = await fetch("./data/heroes.json");
+      const resHeroes = await fetch(`${basePath}/data/heroes.json`);
       if (resHeroes.ok) {
         heroes = await resHeroes.json();
       }
-      const resWR = await fetch("./data/win_rates.json");
+      const resWR = await fetch(`${basePath}/data/win_rates.json`);
       if (resWR.ok) {
         winRates = await resWR.json();
       }
@@ -180,10 +191,11 @@
       { action: "pick", team: t1 },
       { action: "ban", team: t2 },
       { action: "ban", team: t1 },
+      // Phase 2 picks: B picks 3&4, A picks 4&5, B picks 5
+      { action: "pick", team: t2 },
       { action: "pick", team: t2 },
       { action: "pick", team: t1 },
       { action: "pick", team: t1 },
-      { action: "pick", team: t2 },
       { action: "pick", team: t2 }
     ];
   }
@@ -756,8 +768,9 @@
       <div class="glass-panel p-4 flex flex-col gap-4 flex-1">
         
         <!-- Filter Search Row -->
-        <div class="flex flex-col md:flex-row gap-3">
-          <label class="input input-bordered flex items-center gap-2 bg-gray-900 focus-within:input-primary w-full flex-1">
+        <div class="flex flex-col gap-2">
+          <!-- Search bar - full width -->
+          <label class="input input-bordered flex items-center gap-2 bg-gray-900 focus-within:input-primary w-full">
             <span class="text-gray-500 text-sm">🔍</span>
             <input
               type="text"
@@ -767,29 +780,32 @@
             />
           </label>
 
-          <!-- Role Filter -->
-          <select
-            bind:value={selectedRole}
-            class="select select-bordered bg-gray-900 text-white focus:select-primary"
-          >
-            <option value="All">All Roles</option>
-            <option value="Tank">Tanks</option>
-            <option value="Bruiser">Bruisers</option>
-            <option value="Healer">Healers</option>
-            <option value="Ranged Assassin">Ranged Assassins</option>
-            <option value="Melee Assassin">Melee Assassins</option>
-            <option value="Support">Supports</option>
-          </select>
+          <!-- Role + Tag filters on one row -->
+          <div class="flex gap-2">
+            <!-- Role Filter -->
+            <select
+              bind:value={selectedRole}
+              class="select select-bordered select-sm bg-gray-900 text-white focus:select-primary flex-1"
+            >
+              <option value="All">All Roles</option>
+              <option value="Tank">Tanks</option>
+              <option value="Bruiser">Bruisers</option>
+              <option value="Healer">Healers</option>
+              <option value="Ranged Assassin">Ranged Assassins</option>
+              <option value="Melee Assassin">Melee Assassins</option>
+              <option value="Support">Supports</option>
+            </select>
 
-          <!-- Tag Filter -->
-          <select
-            bind:value={selectedTag}
-            class="select select-bordered bg-gray-900 text-white focus:select-primary"
-          >
-            {#each allTags as tag}
-              <option value={tag}>{tag === "All" ? "All Tags" : tag}</option>
-            {/each}
-          </select>
+            <!-- Tag Filter -->
+            <select
+              bind:value={selectedTag}
+              class="select select-bordered select-sm bg-gray-900 text-white focus:select-primary flex-1"
+            >
+              {#each allTags as tag}
+                <option value={tag}>{tag === "All" ? "All Tags" : tag}</option>
+              {/each}
+            </select>
+          </div>
         </div>
 
         <!-- Current Draft Status Banner -->
@@ -931,6 +947,7 @@
                 <div 
                   role="presentation"
                   onmouseenter={() => inspectedHeroId = rec.hero_id}
+                  onclick={() => selectHero(rec.hero_id)}
                   class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex flex-col gap-2 {activeRecTab === 'picks' ? 'hover:border-purple-500/30' : 'hover:border-red-500/30'} transition cursor-pointer"
                 >
                   <div class="flex items-center gap-3">

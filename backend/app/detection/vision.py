@@ -333,10 +333,25 @@ class VisionDetector(BaseDetector):
         if category is None:
             return
 
-        # Find which slot indices are active in the current draft step/phase
-        active_indices = get_active_slots(
-            self.draft_manager.current_step_idx, step.action
-        )
+        # Find which slot index is active for this step.
+        # For ban steps: use the static mapping (step_idx → ban slot position).
+        # For pick steps: the next slot to fill is simply the current count of
+        #   picks already recorded for this team — never scan ahead, which would
+        #   cause hovers / prepicks in future slots to fire prematurely.
+        if step.action == "ban":
+            active_indices = get_active_slots(
+                self.draft_manager.current_step_idx, step.action
+            )
+        else:
+            picks_so_far = (
+                len(self.draft_manager.my_team_picks)
+                if step.team == "my_team"
+                else len(self.draft_manager.enemy_picks)
+            )
+            active_indices = (
+                [picks_so_far] if picks_so_far < len(self.coordinates[category]) else []
+            )
+
         if not active_indices:
             return
 

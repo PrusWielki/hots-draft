@@ -44,11 +44,11 @@ class DraftManager:
             # Phase 2 Bans (Mid-Ban) - Second team bans first in mid-ban
             DraftStep(action="ban", team=t2),
             DraftStep(action="ban", team=t1),
-            # Phase 2 Picks
+            # Phase 2 Picks: B picks 3&4, A picks 4&5, B picks 5
+            DraftStep(action="pick", team=t2),
             DraftStep(action="pick", team=t2),
             DraftStep(action="pick", team=t1),
             DraftStep(action="pick", team=t1),
-            DraftStep(action="pick", team=t2),
             DraftStep(action="pick", team=t2),
         ]
 

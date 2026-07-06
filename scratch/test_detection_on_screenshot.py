@@ -60,15 +60,16 @@ for step_idx in range(16):
 
     print(f"\nStep {step_idx}: {step.action} for {step.team}")
 
+    step_idx_before = draft_manager.current_step_idx
+
     # We will invoke the detection logic for this step multiple times to satisfy stability checks.
     for _ in range(3):
         detector._perform_detection()
-        if draft_manager.get_current_step() != step:
+        if draft_manager.current_step_idx != step_idx_before:
             break
 
     # If the step didn't advance, it means detection failed.
-    next_step = draft_manager.get_current_step()
-    if next_step == step:
+    if draft_manager.current_step_idx == step_idx_before:
         print(
             f"  ==> DETECTION FAILED for Step {step_idx} ({step.action} {step.team}). Stopping."
         )
