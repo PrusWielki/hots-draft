@@ -7,14 +7,14 @@ A desktop draft helper for Heroes of the Storm that reads screen data (via OpenC
 ### 1. Start Python Backend
 ```bash
 cd backend
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --host 0.0.0.0 --reload
 ```
 
 ### 2. Start Svelte Frontend
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host
 ```
 
 ## Documentation

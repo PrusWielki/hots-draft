@@ -27,9 +27,9 @@ The backend runs a FastAPI server. To set up and launch it:
     ```
 3.  Start the FastAPI application:
     ```bash
-    uv run uvicorn app.main:app --reload
+    uv run uvicorn app.main:app --host 0.0.0.0 --reload
     ```
-    The server will be available at `http://localhost:8000`.
+    The server will be available at `http://localhost:8000` (and accessible externally via your PC's IP).
 
 ### 2. Svelte Frontend
 
@@ -43,9 +43,9 @@ The frontend is a Vite + Svelte 5 application styled with Tailwind CSS and Daisy
     ```bash
     npm install
     ```
-3.  Start the development server:
+3.  Start the development server (with network hosting active):
     ```bash
-    npm run dev
+    npm run dev -- --host
     ```
     Open your browser and navigate to the printed URL (usually `http://localhost:5173`).
 
