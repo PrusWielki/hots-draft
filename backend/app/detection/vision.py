@@ -250,7 +250,7 @@ class VisionDetector(BaseDetector):
 
                 if square_crop.size > 0:
                     subfolder = "picks" if step.action == "pick" else "bans"
-                    save_dir = Path("data/draft_templates") / subfolder
+                    save_dir = self.portraits_dir.parent / "draft_templates" / subfolder
                     save_dir.mkdir(parents=True, exist_ok=True)
                     save_path = save_dir / f"{hero_id}.png"
 
