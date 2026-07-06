@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node/frontend
+node_modules/
+dist/
+.svelte-kit/
+.env
+.env.*
+!.env.example
+
+# App data
+data/raw/

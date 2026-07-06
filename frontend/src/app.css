@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;700;800&display=swap");
+
+:root {
+  font-family: "Inter", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0c0f17;
+
+  /* Color system */
+  --bg-main: #060913;
+  --bg-card: rgba(20, 24, 38, 0.6);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(147, 51, 234, 0.5);
+
+  --ally-color: #06b6d4;
+  --ally-glow: rgba(6, 182, 212, 0.25);
+  --enemy-color: #ef4444;
+  --enemy-glow: rgba(239, 68, 68, 0.25);
+  --rec-color: #a855f7;
+  --rec-glow: rgba(168, 85, 247, 0.3);
+  --gold-color: #f59e0b;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 0%, #151a30 0%, #060913 70%);
+  background-attachment: fixed;
+}
+
+/* Glassmorphism styling helper */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Animations */
+@keyframes pulse-border-ally {
+  0%,
+  100% {
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 0 5px rgba(6, 182, 212, 0.2);
+  }
+  50% {
+    border-color: rgba(6, 182, 212, 1);
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.6);
+  }
+}
+
+@keyframes pulse-border-enemy {
+  0%,
+  100% {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 1);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.active-turn-ally {
+  animation: pulse-border-ally 2s infinite ease-in-out;
+}
+
+.active-turn-enemy {
+  animation: pulse-border-enemy 2s infinite ease-in-out;
+}

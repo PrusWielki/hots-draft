@@ -1,0 +1,10 @@
+{
+  "johanna": {
+    "tags": ["blind", "waveclear", "unstoppable", "anti-melee"],
+    "counters": ["malganis", "leoric"]
+  },
+  "illidan": {
+    "tags": ["dive", "sustain", "chase", "jungler"],
+    "synergies": ["abathur", "rehgar", "tassadar"]
+  }
+}
