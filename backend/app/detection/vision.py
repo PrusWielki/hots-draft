@@ -195,6 +195,43 @@ class VisionDetector(BaseDetector):
                 time.sleep(5.0)
             time.sleep(0.8)
 
+    def _match_templates(
+        self, square_crop, match_top_only=False
+    ) -> tuple[Optional[str], float]:
+        if not self.templates:
+            return None, 0.0
+
+        gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+        resized_crop = cv2.resize(gray_crop, (100, 100))
+        cl_crop = self.clahe.apply(resized_crop)
+
+        if match_top_only:
+            # Crop top 60% of height to bypass the red/blue ban overlay bar at the bottom
+            cl_crop = cl_crop[0:60, :]
+
+        best_hero_id = None
+        best_score = 0.0
+
+        for hero_id, variants in self.templates.items():
+            for template in variants:
+                t_temp = template
+                if match_top_only:
+                    t_temp = template[0:60, :]
+
+                if (
+                    t_temp.shape[0] > cl_crop.shape[0]
+                    or t_temp.shape[1] > cl_crop.shape[1]
+                ):
+                    continue
+
+                res = cv2.matchTemplate(cl_crop, t_temp, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, _ = cv2.minMaxLoc(res)
+                if max_val > best_score:
+                    best_score = max_val
+                    best_hero_id = hero_id
+
+        return best_hero_id, best_score
+
     def _perform_detection(self):
         """Capture active slots for the current draft step and compare against templates."""
         import mss
@@ -263,71 +300,58 @@ class VisionDetector(BaseDetector):
                 best_score = 0.0
 
                 if step.action == "pick":
-                    from app.detection.ocr import (  # noqa: PLC0415
-                        ocr_available,
-                        ocr_hero_from_crop,
-                    )
+                    # 1. Fast template matching first (bypass slow OCR if we have high-confidence match)
+                    t_hero, t_score = self._match_templates(square_crop)
+                    if t_hero and t_score >= 0.85:
+                        best_hero_id = t_hero
+                        best_score = t_score
 
-                    if ocr_available():
-                        is_ally = category == "ally_picks"
-                        BANNER_PAD = 150
-                        if is_ally:
-                            x_ocr = max(0, x - BANNER_PAD)
-                            w_ocr = (x + w) - x_ocr
-                        else:
-                            x_ocr = x
-                            w_ocr = min(width - x_ocr, w + BANNER_PAD)
-                        ocr_crop = img_bgr[y : y + h, x_ocr : x_ocr + w_ocr]
-                        hero_id, conf = ocr_hero_from_crop(ocr_crop, is_ally=is_ally)
-                        if hero_id and conf > 0.4:
-                            best_hero_id = hero_id
-                            best_score = conf
-                            print(
-                                f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
+                    # 2. OCR fallback
+                    if best_hero_id is None:
+                        from app.detection.ocr import (  # noqa: PLC0415
+                            ocr_available,
+                            ocr_hero_from_crop,
+                        )
+
+                        if ocr_available():
+                            is_ally = category == "ally_picks"
+                            BANNER_PAD = 150
+                            if is_ally:
+                                x_ocr = max(0, x - BANNER_PAD)
+                                w_ocr = (x + w) - x_ocr
+                            else:
+                                x_ocr = x
+                                w_ocr = min(width - x_ocr, w + BANNER_PAD)
+                            ocr_crop = img_bgr[y : y + h, x_ocr : x_ocr + w_ocr]
+                            hero_id, conf = ocr_hero_from_crop(
+                                ocr_crop, is_ally=is_ally
                             )
-
-                    # Fallback to template matching if OCR didn't fire
-                    if best_hero_id is None and self.templates:
-                        gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
-                        resized_crop = cv2.resize(gray_crop, (100, 100))
-                        cl_crop = self.clahe.apply(resized_crop)
-                        for hero_id, variants in self.templates.items():
-                            for template in variants:
-                                if (
-                                    template.shape[0] > cl_crop.shape[0]
-                                    or template.shape[1] > cl_crop.shape[1]
-                                ):
-                                    continue
-                                res = cv2.matchTemplate(
-                                    cl_crop, template, cv2.TM_CCOEFF_NORMED
-                                )
-                                _, max_val, _, _ = cv2.minMaxLoc(res)
-                                if max_val > best_score:
-                                    best_score = max_val
-                                    best_hero_id = hero_id
-                        if best_score < 0.75:
-                            best_hero_id = None
-
-                else:
-                    gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
-                    resized_crop = cv2.resize(gray_crop, (100, 100))
-                    cl_crop = self.clahe.apply(resized_crop)
-                    for hero_id, variants in self.templates.items():
-                        for template in variants:
-                            if (
-                                template.shape[0] > cl_crop.shape[0]
-                                or template.shape[1] > cl_crop.shape[1]
-                            ):
-                                continue
-                            res = cv2.matchTemplate(
-                                cl_crop, template, cv2.TM_CCOEFF_NORMED
-                            )
-                            _, max_val, _, _ = cv2.minMaxLoc(res)
-                            if max_val > best_score:
-                                best_score = max_val
+                            if hero_id and conf > 0.4:
                                 best_hero_id = hero_id
-                    if best_score < 0.75:
-                        best_hero_id = None
+                                best_score = conf
+                                print(
+                                    f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
+                                )
+
+                    # 3. Soft template matching fallback (0.75 <= score < 0.85) if OCR didn't find anything
+                    if best_hero_id is None and t_hero and t_score >= 0.75:
+                        best_hero_id = t_hero
+                        best_score = t_score
+
+                else:  # ban step
+                    # 1. Try full template matching
+                    t_hero, t_score = self._match_templates(square_crop)
+                    if t_hero and t_score >= 0.75:
+                        best_hero_id = t_hero
+                        best_score = t_score
+                    else:
+                        # 2. Try top-half-only template matching to bypass the red/blue ban overlay bar
+                        t_hero, t_score = self._match_templates(
+                            square_crop, match_top_only=True
+                        )
+                        if t_hero and t_score >= 0.70:
+                            best_hero_id = t_hero
+                            best_score = t_score
 
                 # Process stability tracking for this slot index
                 slot_key = f"{category}_{idx}"
