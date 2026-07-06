@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "copy-assets": "mkdir -p public/data && cp ../data/heroes.json public/data/ && cp ../data/win_rates.json public/data/ && cp -r ../data/portraits public/data/",
+    "copy-assets": "node scripts/copy-assets.js",
     "dev": "npm run copy-assets && vite",
     "build": "npm run copy-assets && vite build",
     "preview": "vite preview"
