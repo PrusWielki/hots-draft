@@ -224,27 +224,80 @@ class VisionDetector(BaseDetector):
             if crop.size == 0:
                 return
 
-            gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-            resized_crop = cv2.resize(gray_crop, (100, 100))
-            cl_crop = self.clahe.apply(resized_crop)
-
-            best_hero_id = None
+            best_hero_id: Optional[str] = None
             best_score = 0.0
 
-            for hero_id, variants in self.templates.items():
-                for template in variants:
-                    if (
-                        template.shape[0] > cl_crop.shape[0]
-                        or template.shape[1] > cl_crop.shape[1]
-                    ):
-                        continue
-                    res = cv2.matchTemplate(cl_crop, template, cv2.TM_CCOEFF_NORMED)
-                    _, max_val, _, _ = cv2.minMaxLoc(res)
-                    if max_val > best_score:
-                        best_score = max_val
-                        best_hero_id = hero_id
+            if step.action == "pick":
+                # --- OCR path: read the name banner ---
+                from app.detection.ocr import (  # noqa: PLC0415
+                    ocr_available,
+                    ocr_hero_from_crop,
+                )
 
-            if best_score > 0.75 and best_hero_id:
+                if ocr_available():
+                    is_ally = category == "ally_picks"
+                    # The name banner is diagonal and extends OUTSIDE the portrait slot:
+                    #   ally picks:   banner curves from middle-left → bottom  → extend LEFT by 150px
+                    #   enemy picks:  banner curves from bottom → middle-right → extend RIGHT by 150px
+                    BANNER_PAD = 150
+                    if is_ally:
+                        x_ocr = max(0, x - BANNER_PAD)
+                        w_ocr = (x + w) - x_ocr
+                    else:
+                        x_ocr = x
+                        w_ocr = min(width - x_ocr, w + BANNER_PAD)
+                    ocr_crop = img_bgr[y : y + h, x_ocr : x_ocr + w_ocr]
+                    hero_id, conf = ocr_hero_from_crop(ocr_crop, is_ally=is_ally)
+                    if hero_id and conf > 0.4:
+                        best_hero_id = hero_id
+                        best_score = conf
+                        print(
+                            f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
+                        )
+
+                # Fallback to template matching if OCR didn't fire
+                if best_hero_id is None and self.templates:
+                    gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                    resized_crop = cv2.resize(gray_crop, (100, 100))
+                    cl_crop = self.clahe.apply(resized_crop)
+                    for hero_id, variants in self.templates.items():
+                        for template in variants:
+                            if (
+                                template.shape[0] > cl_crop.shape[0]
+                                or template.shape[1] > cl_crop.shape[1]
+                            ):
+                                continue
+                            res = cv2.matchTemplate(
+                                cl_crop, template, cv2.TM_CCOEFF_NORMED
+                            )
+                            _, max_val, _, _ = cv2.minMaxLoc(res)
+                            if max_val > best_score:
+                                best_score = max_val
+                                best_hero_id = hero_id
+                    if best_score < 0.75:
+                        best_hero_id = None
+
+            else:
+                # --- Template matching path: bans have no name tag ---
+                gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                resized_crop = cv2.resize(gray_crop, (100, 100))
+                cl_crop = self.clahe.apply(resized_crop)
+                for hero_id, variants in self.templates.items():
+                    for template in variants:
+                        if (
+                            template.shape[0] > cl_crop.shape[0]
+                            or template.shape[1] > cl_crop.shape[1]
+                        ):
+                            continue
+                        res = cv2.matchTemplate(cl_crop, template, cv2.TM_CCOEFF_NORMED)
+                        _, max_val, _, _ = cv2.minMaxLoc(res)
+                        if max_val > best_score:
+                            best_score = max_val
+                            best_hero_id = hero_id
+                if best_score < 0.75:
+                    best_hero_id = None
+
+            if best_hero_id:
                 slot_key = f"{category}_{idx}"
                 current_candidate, count = self.detection_history.get(
                     slot_key, (None, 0)
