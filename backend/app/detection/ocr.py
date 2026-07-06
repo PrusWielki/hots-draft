@@ -54,8 +54,8 @@ def extract_name_region(
     import cv2
 
     h, w = crop_bgr.shape[:2]
-    name_y0 = int(h * 0.55)
-    name_y1 = int(h * 0.82)
+    name_y0 = int(h * 0.50)
+    name_y1 = int(h * 0.85)
 
     # Use the full width — the banner text can be anywhere across the extended crop
     region = crop_bgr[name_y0:name_y1, :]
