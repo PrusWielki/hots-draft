@@ -12,17 +12,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import TypeAdapter
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hots-draft")
 
 app = FastAPI(title="Heroes of the Storm Draft Helper API")
 
-# Serve static files from the data directory
 repo_root = Path(__file__).resolve().parents[2]
 app.mount("/data", StaticFiles(directory=str(repo_root / "data")), name="data")
 
-# Enable CORS for frontend development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Shared memory state
 HERO_DB: Dict[str, Hero] = {}
 DRAFT_MANAGER = DraftManager(my_team_first=True)
 ACTIVE_WEBSOCKETS: Set[WebSocket] = set()
@@ -76,7 +72,6 @@ def get_current_payload() -> dict:
         HERO_DB,
     )
 
-    # Format the current step
     current_step = DRAFT_MANAGER.get_current_step()
     step_data = None
     if current_step:
@@ -149,7 +144,6 @@ async def post_draft_event(event: DraftEvent):
             raise HTTPException(
                 status_code=400, detail="my_team_first is required for set_first_pick"
             )
-        # Save map name when resetting
         old_map = DRAFT_MANAGER.map_name
         DRAFT_MANAGER = DraftManager(
             my_team_first=event.my_team_first, map_name=old_map
@@ -186,7 +180,6 @@ async def post_draft_event(event: DraftEvent):
             status_code=400, detail=f"Unsupported event_type: {event.event_type}"
         )
 
-    # Broadcast changes to all open connections
     await broadcast_state()
     return {"status": "ok"}
 
@@ -197,18 +190,13 @@ async def websocket_endpoint(websocket: WebSocket):
     ACTIVE_WEBSOCKETS.add(websocket)
     logger.info("WebSocket connection established.")
 
-    # Send initial state immediately
     try:
         await websocket.send_json(get_current_payload())
         while True:
-            # Keep connection alive; events flow from HTTP endpoint,
-            # but we listen in case client sends messages
             data = await websocket.receive_text()
-            # If the client wants to send events via WebSocket
             try:
                 event_data = json.loads(data)
                 event = DraftEvent.model_validate(event_data)
-                # Re-route to same logic as HTTP post
                 await post_draft_event(event)
             except Exception as e:
                 logger.error(f"Error handling WebSocket message: {e}")
