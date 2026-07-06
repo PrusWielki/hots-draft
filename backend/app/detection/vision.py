@@ -100,6 +100,14 @@ class VisionDetector(BaseDetector):
             src = draft_file if is_draft else file
             img = cv2.imread(str(src))
             if img is not None:
+                if is_draft:
+                    h, w = img.shape[:2]
+                    cx, cy = w // 2, h // 2
+                    side = min(w, h)
+                    img = img[
+                        cy - side // 2 : cy - side // 2 + side,
+                        cx - side // 2 : cx - side // 2 + side,
+                    ]
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                 if is_draft:
                     h, w = gray.shape
@@ -123,6 +131,13 @@ class VisionDetector(BaseDetector):
                 ):
                     img = cv2.imread(str(file))
                     if img is not None:
+                        h, w = img.shape[:2]
+                        cx, cy = w // 2, h // 2
+                        side = min(w, h)
+                        img = img[
+                            cy - side // 2 : cy - side // 2 + side,
+                            cx - side // 2 : cx - side // 2 + side,
+                        ]
                         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                         h, w = gray.shape
                         b_h, b_w = int(h * border), int(w * border)
