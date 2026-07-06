@@ -71,7 +71,7 @@ _POLISH_NAMES: dict[str, str] = {
     "leoric":           "Leoric",
     "lili":             "Li Li",
     "liming":           "Li-Ming",
-    "lost-vikings":     "Zagubieni Wikingowie",
+    "lost-vikings":     "Zaginieni Wikingowie",
     "lt-morales":       "Porucznik Morales",
     "lucio":            "Lúcio",
     "lunara":           "Lunara",
@@ -229,6 +229,19 @@ for _hero_id, _pl_name in _POLISH_NAMES.items():
 for _hero_id, _en_name in _ENGLISH_NAMES.items():
     _LOOKUP[_normalize(_en_name)] = _hero_id
 
+# Add custom aliases/fallback names directly to _LOOKUP
+_CUSTOM_ALIASES = {
+    "ZAGIN": "lost-vikings",
+    "ZAGUB": "lost-vikings",
+    "ZAGINIENI": "lost-vikings",
+    "ZAGUBIENI": "lost-vikings",
+    "WIKINGOWIE": "lost-vikings",
+    "ZAGINIENI WIKINGOWIE": "lost-vikings",
+    "ZAGUBIENI WIKINGOWIE": "lost-vikings",
+}
+for alias, h_id in _CUSTOM_ALIASES.items():
+    _LOOKUP[alias] = h_id
+
 _ALL_NORMALIZED = list(_LOOKUP.keys())
 
 
@@ -266,7 +279,11 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
             return _LOOKUP[first]
         # 3. Prefix (≥2 chars to catch very short OCR outputs like "SO" → sonya)
         if len(first) >= 2:
-            hits = [(k, v) for k, v in _LOOKUP.items() if k.startswith(first)]
+            hits = [
+                (k, v)
+                for k, v in _LOOKUP.items()
+                if k.startswith(first) or (len(k) >= 3 and first.startswith(k))
+            ]
             if len(hits) == 1:
                 return hits[0][1]
             if len(hits) > 1:
