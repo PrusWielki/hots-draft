@@ -14,6 +14,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "httpx>=0.24.0",
     "mss>=10.2.0",
+    "easyocr>=1.7.2",
 ]
 
 [dependency-groups]

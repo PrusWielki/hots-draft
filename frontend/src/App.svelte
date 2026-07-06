@@ -32,9 +32,19 @@
   let recommendations = $state([]);
   let banRecommendations = $state([]);
   let activeRecTab = $state("picks");
+  let recRoleFilter = $state("All");
   let searchQuery = $state("");
   let selectedRole = $state("All");
   let selectedTag = $state("All");
+
+  let filteredRecs = $derived.by(() => {
+    const list = activeRecTab === "picks" ? recommendations : banRecommendations;
+    if (recRoleFilter === "All") return list;
+    return list.filter(rec => {
+      const hero = getHero(rec.hero_id);
+      return hero && hero.role === recRoleFilter;
+    });
+  });
 
   // Hero Details / Inspector state
   let inspectedHeroId = $state("johanna");
@@ -516,6 +526,22 @@
             Bans Suggestions
           </button>
         </div>
+        <!-- Role Filter for Recommendations -->
+        <div class="flex items-center justify-between gap-2 px-1 py-1 bg-gray-950/20 border-b border-purple-500/10">
+          <span class="text-xs text-gray-400">Filter by Role:</span>
+          <select
+            bind:value={recRoleFilter}
+            class="select select-bordered select-xs bg-gray-900 text-white focus:select-primary"
+          >
+            <option value="All">All Roles</option>
+            <option value="Tank">Tanks</option>
+            <option value="Bruiser">Bruisers</option>
+            <option value="Healer">Healers</option>
+            <option value="Ranged Assassin">Ranged Assassins</option>
+            <option value="Melee Assassin">Melee Assassins</option>
+            <option value="Support">Supports</option>
+          </select>
+        </div>
 
         <!-- Score board -->
         <div class="flex-1 overflow-y-auto pr-1 flex flex-col gap-3 max-h-[320px] min-h-[200px]">
@@ -524,13 +550,17 @@
               Draft is complete. Recommendations disabled.
             </div>
           {:else}
-            {@const currentList = activeRecTab === "picks" ? recommendations : banRecommendations}
-            {#if currentList.length === 0}
+            {@const baseList = activeRecTab === "picks" ? recommendations : banRecommendations}
+            {#if baseList.length === 0}
               <div class="h-full flex items-center justify-center text-center text-gray-500 text-sm p-4">
                 {activeRecTab === 'picks' ? 'Add heroes to see pick recommendations.' : 'Add heroes to see ban recommendations.'}
               </div>
+            {:else if filteredRecs.length === 0}
+              <div class="h-full flex items-center justify-center text-center text-gray-500 text-sm p-4">
+                No recommendations match the selected role.
+              </div>
             {:else}
-              {#each currentList.slice(0, 8) as rec, index}
+              {#each filteredRecs.slice(0, 8) as rec, index}
                 {@const hero = getHero(rec.hero_id)}
                 <div 
                   role="presentation"

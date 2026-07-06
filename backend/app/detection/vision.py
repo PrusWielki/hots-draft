@@ -67,19 +67,17 @@ class VisionDetector(BaseDetector):
     def _load_templates(self):
         """Load portrait templates for OpenCV matching.
 
-        Prefers ``data/draft_templates/`` (real in-game crops) over the
-        default ``data/portraits/`` sprite icons when both exist.
-        Pre-generates scaled variants (0.5–0.9) to handle size differences.
+        Prefers real draft crops when available and pre-generates scaled
+        variants to handle size differences.
         """
         portraits_dir = self.portraits_dir
         draft_dir = self.portraits_dir.parent / "draft_templates"
 
         scales = [0.5, 0.6, 0.7, 0.8, 0.9]
-        border = 0.15  # strip outer 15% from draft templates to remove hex frame UI
+        border = 0.15
         for file in portraits_dir.iterdir():
             if file.suffix not in (".png", ".jpg", ".jpeg") or file.stem == ".gitkeep":
                 continue
-            # Prefer real draft template if available
             draft_file = draft_dir / file.name
             is_draft = draft_file.exists()
             src = draft_file if is_draft else file
@@ -100,7 +98,6 @@ class VisionDetector(BaseDetector):
                     variants.append(cl)
                 self.templates[file.stem] = variants
 
-        # Also load any heroes present only in draft_templates (not in portraits)
         if draft_dir.exists():
             for file in draft_dir.iterdir():
                 if (
@@ -228,7 +225,6 @@ class VisionDetector(BaseDetector):
             best_score = 0.0
 
             if step.action == "pick":
-                # --- OCR path: read the name banner ---
                 from app.detection.ocr import (  # noqa: PLC0415
                     ocr_available,
                     ocr_hero_from_crop,
@@ -236,9 +232,6 @@ class VisionDetector(BaseDetector):
 
                 if ocr_available():
                     is_ally = category == "ally_picks"
-                    # The name banner is diagonal and extends OUTSIDE the portrait slot:
-                    #   ally picks:   banner curves from middle-left → bottom  → extend LEFT by 150px
-                    #   enemy picks:  banner curves from bottom → middle-right → extend RIGHT by 150px
                     BANNER_PAD = 150
                     if is_ally:
                         x_ocr = max(0, x - BANNER_PAD)
@@ -278,7 +271,6 @@ class VisionDetector(BaseDetector):
                         best_hero_id = None
 
             else:
-                # --- Template matching path: bans have no name tag ---
                 gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
                 resized_crop = cv2.resize(gray_crop, (100, 100))
                 cl_crop = self.clahe.apply(resized_crop)

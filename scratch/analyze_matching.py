@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-# Add backend directory to path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.append(str(repo_root / "backend"))
 
@@ -18,7 +17,6 @@ def analyze():
         )
         return
 
-    # Load templates in grayscale
     templates = {}
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     for file in portraits_dir.iterdir():
@@ -34,7 +32,6 @@ def analyze():
                 }
     print(f"Loaded {len(templates)} templates.")
 
-    # List of debug crops
     crop_files = sorted(list(debug_dir.glob("*.png")))
     for crop_file in crop_files:
         if crop_file.name == "full_screenshot.png":
@@ -54,7 +51,6 @@ def analyze():
         clahe_crop = clahe.apply(resized_crop)
         canny_crop = cv2.Canny(resized_crop, 50, 150)
 
-        # Method 1: Standard TM_CCOEFF_NORMED
         std_matches = []
         for name, t in templates.items():
             res = cv2.matchTemplate(resized_crop, t["raw"], cv2.TM_CCOEFF_NORMED)
@@ -62,8 +58,6 @@ def analyze():
             std_matches.append((name, score))
         std_matches.sort(key=lambda m: m[1], reverse=True)
 
-        # Method 2: Center Face (60x60 inside 80x80) with CLAHE
-        # Template is 60x60, crop search area is 80x80
         center_crop = clahe_crop[10:90, 10:90]
         face_matches = []
         for name, t in templates.items():
@@ -73,7 +67,6 @@ def analyze():
             face_matches.append((name, max_val))
         face_matches.sort(key=lambda m: m[1], reverse=True)
 
-        # Method 3: Canny Edge Center Face Match
         canny_matches = []
         center_canny_crop = canny_crop[10:90, 10:90]
         for name, t in templates.items():
@@ -85,7 +78,6 @@ def analyze():
             canny_matches.append((name, max_val))
         canny_matches.sort(key=lambda m: m[1], reverse=True)
 
-        # Method 4: Top-Half Face sliding template match (40x45 face template inside 55x60 search area)
         face_matches_v2 = []
         crop_search = clahe_crop[15:70, 20:80]
         for name, t in templates.items():

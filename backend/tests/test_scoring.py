@@ -5,7 +5,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.models import DraftState, Hero, HotsRole
+import app.scoring
 from app.scoring import score_heroes
+
+# Mock global win rates to avoid affecting unit tests with real data
+app.scoring.WIN_RATES = {}
 
 # Mock database for unit testing
 MOCK_HERO_DB = {

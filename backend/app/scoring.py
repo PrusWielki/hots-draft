@@ -1,6 +1,18 @@
+import json
+from pathlib import Path
 from typing import Dict, List
 
 from app.models import DraftState, Hero, HotsRole, Recommendation
+
+# Load win rates data
+_win_rates_path = Path(__file__).resolve().parents[2] / "data" / "win_rates.json"
+WIN_RATES = {}
+if _win_rates_path.exists():
+    try:
+        with open(_win_rates_path, "r", encoding="utf-8") as f:
+            WIN_RATES = json.load(f)
+    except Exception as e:
+        print(f"Error loading win rates: {e}")
 
 
 def score_heroes(
@@ -97,6 +109,17 @@ def score_heroes(
                 f"{hero.tier}-Tier classification ({'+' if tier_adj >= 0 else ''}{tier_adj:.0f} pts)"
             )
 
+        # Global win rate adjustment: (win_rate - 50.0) * 2.0
+        if hero_id in WIN_RATES:
+            stats = WIN_RATES[hero_id]
+            win_rate = stats.get("win_rate", 50.0)
+            wr_adj = (win_rate - 50.0) * 2.0
+            if wr_adj != 0.0:
+                base_score += wr_adj
+                reasons.append(
+                    f"Global Win Rate of {win_rate:.1f}% ({'+' if wr_adj >= 0 else ''}{wr_adj:.1f} pts)"
+                )
+
         if draft_state.map_name and hero.map_performance:
             map_mod = hero.map_performance.get(draft_state.map_name)
             if map_mod:
@@ -149,6 +172,22 @@ def score_bans(
         if hero.recommended_ban:
             score += 25.0
             reasons.append("High meta ban priority (+25 pts)")
+
+        # Global stats ban weight: win rate deviation + ban rate weight
+        if hero_id in WIN_RATES:
+            stats = WIN_RATES[hero_id]
+            win_rate = stats.get("win_rate", 50.0)
+            ban_rate = stats.get("ban_rate", 0.0)
+
+            # High win rate + high ban rate makes a target S-tier ban
+            wr_factor = max(0.0, win_rate - 50.0) * 1.5
+            br_factor = ban_rate * 0.3
+            ban_adj = wr_factor + br_factor
+            if ban_adj > 0.0:
+                score += ban_adj
+                reasons.append(
+                    f"Meta presence (WR {win_rate:.1f}%, Ban {ban_rate:.1f}%) (+{ban_adj:.1f} pts)"
+                )
 
         for ally_id in draft_state.my_team_picks:
             if ally_id not in hero_db:
