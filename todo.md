@@ -1,7 +1,7 @@
-1. Maybe add role base filtering to the suggested picks and bans. Right now it shows top n overall, what if I want to pick a specific role?
-2. Maybe in the suggested picks include current teamcomp and optimal teamcomps. Like on Heroes Profile it shows bruiser heavy teamcomps are good. Even 3 bruisers, 1 healer one range but also 2 bruisers 2 ranged 1 healer, but probably the standard 1 tank, 1 bruiser, 1 healer, 2 ranged are also fine.
-3. Let's publish a standalone website without opencv if possible on github pages.
-4. Maybe include win rate and ban rate for scoring from https://www.heroesprofile.com/Global/Hero  html is in /home/patryk/Downloads/Global Hero Stats _ Heroes Profile.html
+1. (DONE) Maybe add role base filtering to the suggested picks and bans. Right now it shows top n overall, what if I want to pick a specific role?
+2. (DONE) Maybe in the suggested picks include current teamcomp and optimal teamcomps. Like on Heroes Profile it shows bruiser heavy teamcomps are good. Even 3 bruisers, 1 healer one range but also 2 bruisers 2 ranged 1 healer, but probably the standard 1 tank, 1 bruiser, 1 healer, 2 ranged are also fine.
+3. (DONE) Let's publish a standalone website without opencv if possible on github pages.
+4. (DONE) Maybe include win rate and ban rate for scoring from https://www.heroesprofile.com/Global/Hero  html is in /home/patryk/Downloads/Global Hero Stats _ Heroes Profile.html
 
 the copied data is:
  Avg 	49.99	±1.20	1.36|-1.14	17.49	11.11	6.37	24|-23	9,033	
