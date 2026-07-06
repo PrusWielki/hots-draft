@@ -30,6 +30,8 @@
     current_step: null
   });
   let recommendations = $state([]);
+  let banRecommendations = $state([]);
+  let activeRecTab = $state("picks");
   let searchQuery = $state("");
   let selectedRole = $state("All");
   let selectedTag = $state("All");
@@ -43,6 +45,16 @@
     // Reset build index when inspected hero changes
     if (inspectedHeroId) {
       selectedBuildIdx = 0;
+    }
+  });
+
+  $effect(() => {
+    if (draftState.current_step) {
+      if (draftState.current_step.action === "ban") {
+        activeRecTab = "bans";
+      } else {
+        activeRecTab = "picks";
+      }
     }
   });
   
@@ -96,6 +108,9 @@
         }
         if (payload.recommendations) {
           recommendations = payload.recommendations;
+        }
+        if (payload.ban_recommendations) {
+          banRecommendations = payload.ban_recommendations;
         }
       } catch (e) {
         console.error("Error parsing WS message:", e);
@@ -486,82 +501,101 @@
           <span class="text-xs bg-purple-950/60 text-purple-300 px-2 py-0.5 rounded-full border border-purple-800/30">AI Scoring</span>
         </h2>
 
+        <!-- Tabs -->
+        <div class="tabs tabs-boxed bg-gray-950/60 grid grid-cols-2 p-1 border border-gray-855">
+          <button 
+            onclick={() => activeRecTab = "picks"}
+            class="tab tab-sm font-semibold {activeRecTab === 'picks' ? 'tab-active bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}"
+          >
+            Picks Suggestions
+          </button>
+          <button 
+            onclick={() => activeRecTab = "bans"}
+            class="tab tab-sm font-semibold {activeRecTab === 'bans' ? 'tab-active bg-red-600 text-white' : 'text-gray-400 hover:text-gray-200'}"
+          >
+            Bans Suggestions
+          </button>
+        </div>
+
         <!-- Score board -->
         <div class="flex-1 overflow-y-auto pr-1 flex flex-col gap-3 max-h-[320px] min-h-[200px]">
           {#if draftState.is_complete}
             <div class="h-full flex items-center justify-center text-center text-gray-500 text-sm p-4">
               Draft is complete. Recommendations disabled.
             </div>
-          {:else if recommendations.length === 0}
-            <div class="h-full flex items-center justify-center text-center text-gray-500 text-sm p-4">
-              Add heroes to see recommendations.
-            </div>
           {:else}
-            {#each recommendations.slice(0, 8) as rec, index}
-              {@const hero = getHero(rec.hero_id)}
-              <div 
-                role="presentation"
-                onmouseenter={() => inspectedHeroId = rec.hero_id}
-                class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex flex-col gap-2 hover:border-purple-500/30 transition cursor-pointer"
-              >
-                <div class="flex items-center gap-3">
-                  <!-- Rank number -->
-                  <div class="h-6 w-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold {index === 0 ? 'text-amber-400 border-amber-500/40' : 'text-gray-400'}">
-                    #{index + 1}
-                  </div>
-                  
-                  <!-- Portrait -->
-                  <div class="relative h-10 w-10 rounded bg-gray-850 overflow-hidden border border-purple-500/20">
-                    <img
-                      src="{backendUrl}/data/portraits/{rec.hero_id}.png"
-                      alt={hero.name}
-                      class="h-full w-full object-cover"
-                      onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
-                    />
-                    <div class="hidden absolute inset-0 flex items-center justify-center bg-purple-950/80 font-bold text-xs text-purple-300">
-                      {getRoleAbbreviation(hero.role)}
-                    </div>
-                  </div>
-
-                  <!-- Name and Role -->
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                      <span class="font-bold text-white text-sm truncate">{hero.name}</span>
-                      
-                      <!-- Tier badge -->
-                      <span class="text-[8px] font-extrabold px-1 rounded border shadow-sm
-                        {hero.tier === 'S' ? 'bg-amber-500 text-black border-amber-300' : 
-                         hero.tier === 'A' ? 'bg-purple-600 text-white border-purple-400' :
-                         hero.tier === 'B' ? 'bg-blue-600 text-white border-blue-400' :
-                         hero.tier === 'C' ? 'bg-gray-600 text-gray-200 border-gray-550' :
-                         'bg-rose-950 text-rose-300 border-rose-800'}"
-                      >
-                        {hero.tier}
-                      </span>
-                    </div>
-                    <div class="text-xs text-gray-400">{hero.role}</div>
-                  </div>
-
-                  <!-- Score -->
-                  <div class="text-right">
-                    <div class="text-sm font-bold text-purple-400">{rec.score}</div>
-                    <div class="text-[9px] text-gray-500">score</div>
-                  </div>
-                </div>
-
-                <!-- Reasons list -->
-                {#if rec.reasons && rec.reasons.length > 0}
-                  <div class="border-t border-gray-850 pt-2 flex flex-col gap-1">
-                    {#each rec.reasons as reason}
-                      <div class="text-[10px] text-gray-400 flex items-start gap-1">
-                        <span class="text-purple-400">•</span>
-                        <span>{reason}</span>
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
+            {@const currentList = activeRecTab === "picks" ? recommendations : banRecommendations}
+            {#if currentList.length === 0}
+              <div class="h-full flex items-center justify-center text-center text-gray-500 text-sm p-4">
+                {activeRecTab === 'picks' ? 'Add heroes to see pick recommendations.' : 'Add heroes to see ban recommendations.'}
               </div>
-            {/each}
+            {:else}
+              {#each currentList.slice(0, 8) as rec, index}
+                {@const hero = getHero(rec.hero_id)}
+                <div 
+                  role="presentation"
+                  onmouseenter={() => inspectedHeroId = rec.hero_id}
+                  class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 flex flex-col gap-2 {activeRecTab === 'picks' ? 'hover:border-purple-500/30' : 'hover:border-red-500/30'} transition cursor-pointer"
+                >
+                  <div class="flex items-center gap-3">
+                    <!-- Rank number -->
+                    <div class="h-6 w-6 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold {index === 0 ? (activeRecTab === 'picks' ? 'text-amber-400 border-amber-500/40' : 'text-red-400 border-red-500/40') : 'text-gray-400'}">
+                      #{index + 1}
+                    </div>
+                    
+                    <!-- Portrait -->
+                    <div class="relative h-10 w-10 rounded bg-gray-850 overflow-hidden border {activeRecTab === 'picks' ? 'border-purple-500/20' : 'border-red-500/20'}">
+                      <img
+                        src="{backendUrl}/data/portraits/{rec.hero_id}.png"
+                        alt={hero.name}
+                        class="h-full w-full object-cover"
+                        onerror={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextElementSibling.style.display='flex'; }}
+                      />
+                      <div class="hidden absolute inset-0 flex items-center justify-center bg-purple-950/80 font-bold text-xs {activeRecTab === 'picks' ? 'text-purple-300' : 'text-red-300'}">
+                        {getRoleAbbreviation(hero.role)}
+                      </div>
+                    </div>
+
+                    <!-- Name and Role -->
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-bold text-white text-sm truncate">{hero.name}</span>
+                        
+                        <!-- Tier badge -->
+                        <span class="text-[8px] font-extrabold px-1 rounded border shadow-sm
+                          {hero.tier === 'S' ? 'bg-amber-500 text-black border-amber-300' : 
+                           hero.tier === 'A' ? 'bg-purple-600 text-white border-purple-400' :
+                           hero.tier === 'B' ? 'bg-blue-600 text-white border-blue-400' :
+                           hero.tier === 'C' ? 'bg-gray-600 text-gray-200 border-gray-550' :
+                           'bg-rose-950 text-rose-300 border-rose-800'}"
+                        >
+                          {hero.tier}
+                        </span>
+                      </div>
+                      <div class="text-xs text-gray-400">{hero.role}</div>
+                    </div>
+
+                    <!-- Score -->
+                    <div class="text-right">
+                      <div class="text-sm font-bold {activeRecTab === 'picks' ? 'text-purple-400' : 'text-red-400'}">{rec.score}</div>
+                      <div class="text-[9px] text-gray-500">score</div>
+                    </div>
+                  </div>
+
+                  <!-- Reasons list -->
+                  {#if rec.reasons && rec.reasons.length > 0}
+                    <div class="border-t border-gray-850 pt-2 flex flex-col gap-1">
+                      {#each rec.reasons as reason}
+                        <div class="text-[10px] text-gray-400 flex items-start gap-1">
+                          <span class={activeRecTab === 'picks' ? 'text-purple-400' : 'text-red-400'}>•</span>
+                          <span>{reason}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
           {/if}
         </div>
       </div>

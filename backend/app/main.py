@@ -7,7 +7,7 @@ from typing import Dict, List, Set
 from app.detection.base import DraftEvent
 from app.draft import DraftManager
 from app.models import DraftState, Hero
-from app.scoring import score_heroes
+from app.scoring import score_bans, score_heroes
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -83,16 +83,15 @@ async def shutdown_event():
 
 def get_current_payload() -> dict:
     """Helper to compile current draft state and recommendations."""
-    recs = score_heroes(
-        DraftState(
-            map_name=DRAFT_MANAGER.map_name,
-            my_team_picks=DRAFT_MANAGER.my_team_picks,
-            my_team_bans=DRAFT_MANAGER.my_team_bans,
-            enemy_picks=DRAFT_MANAGER.enemy_picks,
-            enemy_bans=DRAFT_MANAGER.enemy_bans,
-        ),
-        HERO_DB,
+    state_data = DraftState(
+        map_name=DRAFT_MANAGER.map_name,
+        my_team_picks=DRAFT_MANAGER.my_team_picks,
+        my_team_bans=DRAFT_MANAGER.my_team_bans,
+        enemy_picks=DRAFT_MANAGER.enemy_picks,
+        enemy_bans=DRAFT_MANAGER.enemy_bans,
     )
+    recs = score_heroes(state_data, HERO_DB)
+    ban_recs = score_bans(state_data, HERO_DB)
 
     current_step = DRAFT_MANAGER.get_current_step()
     step_data = None
@@ -115,6 +114,7 @@ def get_current_payload() -> dict:
             "current_step": step_data,
         },
         "recommendations": [rec.model_dump() for rec in recs],
+        "ban_recommendations": [rec.model_dump() for rec in ban_recs],
     }
 
 

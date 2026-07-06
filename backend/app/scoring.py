@@ -113,3 +113,82 @@ def score_heroes(
 
     recommendations.sort(key=lambda r: r.score, reverse=True)
     return recommendations
+
+
+def score_bans(
+    draft_state: DraftState, hero_db: Dict[str, Hero]
+) -> List[Recommendation]:
+    """Score all available heroes for ban recommendations based on current draft
+
+    state.
+    """
+    ban_recs = []
+
+    unavailable = set(
+        draft_state.my_team_picks
+        + draft_state.my_team_bans
+        + draft_state.enemy_picks
+        + draft_state.enemy_bans
+    )
+
+    for hero_id, hero in hero_db.items():
+        if hero_id in unavailable:
+            continue
+
+        score = 0.0
+        reasons = []
+
+        tier_weights = {"S": 15.0, "A": 8.0, "B": 2.0, "C": -5.0, "D": -10.0}
+        tier_score = tier_weights.get(hero.tier, 0.0)
+        if tier_score != 0.0:
+            score += tier_score
+            reasons.append(
+                f"{hero.tier}-Tier meta power ({'+' if tier_score >= 0 else ''}{tier_score:.0f} pts)"
+            )
+
+        if hero.recommended_ban:
+            score += 25.0
+            reasons.append("High meta ban priority (+25 pts)")
+
+        for ally_id in draft_state.my_team_picks:
+            if ally_id not in hero_db:
+                continue
+            ally = hero_db[ally_id]
+            if ally_id in hero.counters:
+                score += 25.0
+                reasons.append(f"Hard counters our {ally.name} (+25 pts)")
+
+        for enemy_id in draft_state.enemy_picks:
+            if enemy_id not in hero_db:
+                continue
+            enemy = hero_db[enemy_id]
+            if enemy_id in hero.synergies or hero_id in enemy.synergies:
+                score += 15.0
+                reasons.append(f"Synergizes with enemy {enemy.name} (+15 pts)")
+
+        if draft_state.map_name and hero.map_performance:
+            map_mod = hero.map_performance.get(draft_state.map_name)
+            if map_mod and map_mod > 1.0:
+                score += 12.0
+                reasons.append(f"Strong on '{draft_state.map_name}' (+12 pts)")
+            elif map_mod and map_mod < 1.0:
+                score -= 10.0
+                reasons.append(f"Weak on '{draft_state.map_name}' (-10 pts)")
+
+        for enemy_id in draft_state.enemy_picks:
+            if enemy_id not in hero_db:
+                continue
+            enemy = hero_db[enemy_id]
+            if enemy_id in hero.counters:
+                score -= 15.0
+                reasons.append(
+                    f"Counters enemy {enemy.name} (keep open to pick) (-15 pts)"
+                )
+
+        if score > 0:
+            ban_recs.append(
+                Recommendation(hero_id=hero_id, score=round(score, 1), reasons=reasons)
+            )
+
+    ban_recs.sort(key=lambda r: r.score, reverse=True)
+    return ban_recs
