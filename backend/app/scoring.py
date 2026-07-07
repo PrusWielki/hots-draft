@@ -37,6 +37,10 @@ def score_heroes(
         + draft_state.enemy_bans
     )
 
+    if "cho" in unavailable or "gall" in unavailable:
+        unavailable.add("cho")
+        unavailable.add("gall")
+
     ally_roles = [
         hero_db[h_id].role for h_id in draft_state.my_team_picks if h_id in hero_db
     ]
@@ -244,6 +248,10 @@ def score_bans(
         + draft_state.enemy_picks
         + draft_state.enemy_bans
     )
+
+    if "cho" in unavailable or "gall" in unavailable:
+        unavailable.add("cho")
+        unavailable.add("gall")
 
     enemy_roles = [
         hero_db[h_id].role for h_id in draft_state.enemy_picks if h_id in hero_db

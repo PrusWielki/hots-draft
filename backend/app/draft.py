@@ -89,6 +89,23 @@ class DraftManager:
 
         self.history.append((self.current_step_idx, hero_id))
         self.current_step_idx += 1
+
+        # Cho'Gall special rule: if Cho is picked, automatically pick Gall in the next slot (and vice versa)
+        if step.action == "pick" and hero_id in ("cho", "gall"):
+            companion_id = "gall" if hero_id == "cho" else "cho"
+            next_step = self.get_current_step()
+            if next_step and next_step.action == "pick" and next_step.team == step.team:
+                if (
+                    companion_id not in self.my_team_picks
+                    and companion_id not in self.enemy_picks
+                ):
+                    if step.team == "my_team":
+                        self.my_team_picks.append(companion_id)
+                    else:
+                        self.enemy_picks.append(companion_id)
+                    self.history.append((self.current_step_idx, companion_id))
+                    self.current_step_idx += 1
+
         return True
 
     def undo_last_action(self) -> bool:
@@ -114,6 +131,20 @@ class DraftManager:
                 self.enemy_bans.remove(hero_id)
 
         self.current_step_idx = step_idx
+
+        # Cho'Gall special rule: if we undo Cho/Gall, automatically undo its companion pick
+        if step.action == "pick" and hero_id in ("cho", "gall"):
+            companion_id = "gall" if hero_id == "cho" else "cho"
+            if self.history:
+                prev_step_idx, prev_hero_id = self.history[-1]
+                if prev_hero_id == companion_id:
+                    self.history.pop()
+                    if step.team == "my_team":
+                        self.my_team_picks.remove(companion_id)
+                    else:
+                        self.enemy_picks.remove(companion_id)
+                    self.current_step_idx = prev_step_idx
+
         return True
 
     def reset(self):
