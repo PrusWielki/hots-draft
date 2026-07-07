@@ -87,6 +87,8 @@ class VisionDetector(BaseDetector):
 
         Separates templates into picks and bans, using clean portraits as fallback.
         """
+        import numpy as np
+
         portraits_dir = self.portraits_dir
         draft_dir = self.portraits_dir.parent / "draft_templates"
         picks_dir = draft_dir / "picks"
@@ -95,8 +97,25 @@ class VisionDetector(BaseDetector):
         scales = [0.5, 0.6, 0.7, 0.8, 0.9]
         border = 0.15
 
-        def load_variants(src_path, is_draft=False):
-            img = cv2.imread(str(src_path))
+        # Check if the ban overlay model is available
+        model_w_path = portraits_dir.parent / "ban_model_w.png"
+        model_overlay_path = portraits_dir.parent / "ban_model_overlay.png"
+        has_ban_model = model_w_path.exists() and model_overlay_path.exists()
+
+        W = None
+        Overlay = None
+        if has_ban_model:
+            w_img = cv2.imread(str(model_w_path), cv2.IMREAD_GRAYSCALE)
+            overlay_img = cv2.imread(str(model_overlay_path))
+            if w_img is not None and overlay_img is not None:
+                W = w_img.astype(float) / 255.0
+                Overlay = overlay_img.astype(float)
+
+        def load_variants(src, is_draft=False):
+            if isinstance(src, (str, Path)):
+                img = cv2.imread(str(src))
+            else:
+                img = src  # already a numpy array BGR image
             if img is None:
                 return None
             if is_draft:
@@ -118,14 +137,38 @@ class VisionDetector(BaseDetector):
                 for s in scales
             ]
 
-        # 1. Load clean portraits as baseline for both picks and bans
+        # 1. Load clean portraits as baseline for picks, and synthesize/load for bans
         for file in portraits_dir.iterdir():
             if file.suffix not in (".png", ".jpg", ".jpeg") or file.stem == ".gitkeep":
                 continue
-            variants = load_variants(file, is_draft=False)
-            if variants:
-                self.pick_templates[file.stem] = variants
-                self.ban_templates[file.stem] = variants
+
+            clean_img = cv2.imread(str(file))
+            if clean_img is None:
+                continue
+
+            # Pick template baseline
+            pick_vars = load_variants(clean_img, is_draft=False)
+            if pick_vars:
+                self.pick_templates[file.stem] = pick_vars
+
+            # Ban template baseline
+            if W is not None and Overlay is not None:
+                # Synthesize BGR ban template
+                # Resize clean image to 120x120 model size first
+                clean_resized = cv2.resize(clean_img, (120, 120))
+                synth = np.zeros((120, 120, 3), dtype=np.float64)
+                for c in range(3):
+                    synth[:, :, c] = clean_resized[:, :, c] * W + Overlay[:, :, c]
+                synth = np.clip(synth, 0, 255).astype(np.uint8)
+
+                # Load variants with is_draft=True because it contains the overlay & border
+                ban_vars = load_variants(synth, is_draft=True)
+            else:
+                # Fallback to plain portrait
+                ban_vars = load_variants(clean_img, is_draft=False)
+
+            if ban_vars:
+                self.ban_templates[file.stem] = ban_vars
 
         # 2. Overwrite with specific pick draft templates if present
         picks_count = 0
