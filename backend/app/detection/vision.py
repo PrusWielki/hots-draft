@@ -220,6 +220,11 @@ class VisionDetector(BaseDetector):
         """Set a detection cooldown to prevent overriding manual overrides."""
         self.cooldown_until = time.time() + seconds
 
+    def reset(self):
+        """Reset the detector's state, clearing detection history and cooldown."""
+        self.detection_history.clear()
+        self.cooldown_until = 0.0
+
     def _loop(self):
         """Main detection loop running periodically."""
         while self.running:

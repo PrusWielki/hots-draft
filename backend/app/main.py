@@ -194,15 +194,22 @@ async def post_draft_event(event: DraftEvent):
         DRAFT_MANAGER = DraftManager(
             my_team_first=event.my_team_first, map_name=old_map
         )
+        if VISION_DETECTOR:
+            VISION_DETECTOR.draft_manager = DRAFT_MANAGER
+            VISION_DETECTOR.reset()
 
     elif event.event_type == "map_select":
         DRAFT_MANAGER.map_name = event.map_name
 
     elif event.event_type == "reset":
         DRAFT_MANAGER.reset()
+        if VISION_DETECTOR:
+            VISION_DETECTOR.reset()
 
     elif event.event_type == "undo":
         DRAFT_MANAGER.undo_last_action()
+        if VISION_DETECTOR:
+            VISION_DETECTOR.reset()
 
     elif event.event_type in ("pick", "ban"):
         if not event.hero_id:
