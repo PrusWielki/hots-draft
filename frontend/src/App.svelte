@@ -971,6 +971,18 @@
               bind:value={searchQuery}
               class="grow bg-transparent border-none outline-none focus:ring-0 focus:outline-none text-white h-full"
             />
+            {#if searchQuery}
+              <button
+                onclick={() => searchQuery = ""}
+                class="text-gray-500 hover:text-white transition-colors duration-150 p-1 rounded-full hover:bg-gray-800 flex items-center justify-center"
+                type="button"
+                aria-label="Clear search"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            {/if}
           </label>
 
           <!-- Role + Tag filters on one row -->
