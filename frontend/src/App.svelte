@@ -36,6 +36,8 @@
   let searchQuery = $state("");
   let selectedRole = $state("All");
   let selectedTag = $state("All");
+  let latestDebugInfo = $state(null);
+  let showDebugPanel = $state(false);
 
   let filteredRecs = $derived.by(() => {
     const list = activeRecTab === "picks" ? recommendations : banRecommendations;
@@ -65,6 +67,28 @@
       clearTimeout(hoverTimeout);
       hoverTimeout = null;
     }
+  }
+
+  function formatSlotName(category, idx) {
+    const names = {
+      ally_picks: "Ally Pick",
+      ally_bans: "Ally Ban",
+      enemy_picks: "Enemy Pick",
+      enemy_bans: "Enemy Ban"
+    };
+    return `${names[category] || category} #${idx + 1}`;
+  }
+
+  function getMatchMethodLabel(method) {
+    const labels = {
+      template_fast: "Template (Fast)",
+      template_soft: "Template (Soft)",
+      template_full: "Template (Full)",
+      template_top_only: "Template (Top)",
+      ocr: "EasyOCR",
+      below_threshold: "Below Threshold"
+    };
+    return labels[method] || method;
   }
 
   $effect(() => {
@@ -166,14 +190,18 @@
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.draft_state) {
-          draftState = payload.draft_state;
-        }
-        if (payload.recommendations) {
-          recommendations = payload.recommendations;
-        }
-        if (payload.ban_recommendations) {
-          banRecommendations = payload.ban_recommendations;
+        if (payload.event_type === "debug_update") {
+          latestDebugInfo = payload.debug;
+        } else {
+          if (payload.draft_state) {
+            draftState = payload.draft_state;
+          }
+          if (payload.recommendations) {
+            recommendations = payload.recommendations;
+          }
+          if (payload.ban_recommendations) {
+            banRecommendations = payload.ban_recommendations;
+          }
         }
       } catch (e) {
         console.error("Error parsing WS message:", e);
@@ -689,8 +717,152 @@
       >
         Reload DB
       </button>
+
+      <button
+        onclick={() => showDebugPanel = !showDebugPanel}
+        class="btn btn-sm font-medium {showDebugPanel ? 'btn-primary bg-purple-600 border-purple-500 text-white' : 'btn-outline'}"
+      >
+        🔍 Debug CV
+      </button>
     </div>
   </header>
+
+  {#if showDebugPanel}
+    <div class="glass-panel p-4 mb-6 border-purple-500/20 bg-purple-950/5 animate-fade-in flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-purple-500/10 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+          </span>
+          <h2 class="text-sm font-bold tracking-wider text-purple-400 font-outfit uppercase">Computer Vision Live Monitor</h2>
+        </div>
+        {#if latestDebugInfo}
+          <span class="text-xs text-gray-500">
+            Last Frame: {new Date(latestDebugInfo.timestamp * 1000).toLocaleTimeString()}
+          </span>
+        {:else}
+          <span class="text-xs text-amber-500 font-medium">Waiting for CV frames...</span>
+        {/if}
+      </div>
+
+      {#if !latestDebugInfo}
+        <div class="py-8 text-center text-gray-500 text-sm">
+          No live CV frames received yet. Frame capture starts automatically when a pick/ban step becomes active.
+        </div>
+      {:else}
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {#each latestDebugInfo.slots as slot}
+            {@const isAlly = slot.category.startsWith("ally")}
+            {@const hero = slot.best_hero_id ? getHero(slot.best_hero_id) : null}
+            <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3 flex flex-col gap-3 relative overflow-hidden">
+              
+              <!-- Slot Header Badge -->
+              <div class="flex justify-between items-center">
+                <span class="text-xs font-bold px-2 py-0.5 rounded border 
+                  {isAlly ? 'bg-cyan-950/60 text-cyan-300 border-cyan-800/30' : 'bg-rose-950/60 text-rose-300 border-rose-800/30'}">
+                  {formatSlotName(slot.category, slot.idx)}
+                </span>
+                
+                {#if slot.stability_count >= 2}
+                  <span class="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded">
+                    LOCKED
+                  </span>
+                {:else if slot.stability_count > 0}
+                  <span class="text-[9px] font-bold px-1.5 py-0.2 bg-amber-950 text-amber-400 border border-amber-800 rounded animate-pulse">
+                    MATCHING ({slot.stability_count}/2)
+                  </span>
+                {/if}
+              </div>
+
+              <!-- Images: Live Crop vs Matched Template -->
+              <div class="flex items-center justify-around gap-2 bg-gray-950/40 p-2 rounded border border-gray-850">
+                <!-- Live crop -->
+                <div class="flex flex-col items-center gap-1">
+                  <span class="text-[9px] text-gray-500 font-bold uppercase">Screen Crop</span>
+                  {#if slot.crop_base64}
+                    <img 
+                      src={slot.crop_base64} 
+                      alt="Crop" 
+                      class="h-14 w-14 object-cover rounded border border-gray-800"
+                    />
+                  {:else}
+                    <div class="h-14 w-14 rounded border border-gray-800 bg-gray-900 flex items-center justify-center text-gray-700 text-xs font-bold">
+                      N/A
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="text-gray-600 font-bold text-sm">➔</div>
+
+                <!-- Match Template -->
+                <div class="flex flex-col items-center gap-1">
+                  <span class="text-[9px] text-gray-500 font-bold uppercase">Template Match</span>
+                  {#if hero}
+                    <img 
+                      src="{assetsUrl}/data/portraits/{slot.best_hero_id}.png" 
+                      alt={hero.name} 
+                      class="h-14 w-14 object-cover rounded border border-purple-500/20"
+                    />
+                  {:else}
+                    <div class="h-14 w-14 rounded border border-dashed border-gray-800 bg-gray-900 flex items-center justify-center text-gray-600 text-lg font-bold">
+                      ?
+                    </div>
+                  {/if}
+                </div>
+              </div>
+
+              <!-- Match Statistics -->
+              <div class="flex flex-col gap-1.5 text-xs">
+                {#if slot.is_empty}
+                  <div class="text-center py-2 text-gray-500 font-semibold italic bg-gray-950/20 rounded">
+                    Slot is Empty / Dark
+                  </div>
+                {:else}
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-400">Match:</span>
+                    <span class="font-bold text-white truncate max-w-[110px]">
+                      {hero ? hero.name : "Unknown"}
+                    </span>
+                  </div>
+
+                  {#if hero}
+                    <!-- Score Meter -->
+                    <div class="flex flex-col gap-0.5">
+                      <div class="flex justify-between text-[10px]">
+                        <span class="text-gray-500">Confidence:</span>
+                        <span class="font-bold {slot.best_score >= 0.85 ? 'text-emerald-400' : slot.best_score >= 0.70 ? 'text-amber-400' : 'text-rose-400'}">
+                          {(slot.best_score * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div class="w-full bg-gray-850 h-1.5 rounded overflow-hidden border border-gray-800">
+                        <div 
+                          class="h-full rounded {slot.best_score >= 0.85 ? 'bg-emerald-500' : slot.best_score >= 0.70 ? 'bg-amber-500' : 'bg-rose-500'}"
+                          style="width: {Math.min(100, Math.max(0, slot.best_score * 100))}%"
+                        ></div>
+                      </div>
+                    </div>
+                    
+                    <div class="flex justify-between text-[10px]">
+                      <span class="text-gray-500">Method:</span>
+                      <span class="text-purple-300 font-semibold bg-purple-950/40 px-1 py-0.2 rounded border border-purple-900/30 font-mono text-[9px]">
+                        {getMatchMethodLabel(slot.match_method)}
+                      </span>
+                    </div>
+                  {:else}
+                    <div class="text-center py-1 text-gray-500 font-medium italic">
+                      No matching candidate
+                    </div>
+                  {/if}
+                {/if}
+              </div>
+
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Main Roster & Picks Grid -->
   <div class="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1">

@@ -60,11 +60,18 @@ def get_active_slots(step_idx: int, action: str) -> list[int]:
 class VisionDetector(BaseDetector):
     """OpenCV-based screen detection for HotS draft."""
 
-    def __init__(self, portraits_dir: Path, draft_manager: Any, on_match_callback: Any):
+    def __init__(
+        self,
+        portraits_dir: Path,
+        draft_manager: Any,
+        on_match_callback: Any,
+        on_debug_callback: Optional[Any] = None,
+    ):
         super().__init__()
         self.portraits_dir = portraits_dir
         self.draft_manager = draft_manager
         self.on_match_callback = on_match_callback
+        self.on_debug_callback = on_debug_callback
         self.running = False
         self._thread: Optional[threading.Thread] = None
         self.pick_templates: Dict[str, Any] = {}
@@ -398,6 +405,7 @@ class VisionDetector(BaseDetector):
         if not active_indices:
             return
 
+        debug_slots = []
         with mss.mss() as sct:
             monitor = sct.monitors[1]
             screenshot = sct.grab(monitor)
@@ -439,6 +447,7 @@ class VisionDetector(BaseDetector):
 
                 best_hero_id: Optional[str] = None
                 best_score = 0.0
+                match_method = "unknown"
 
                 if step.action == "pick":
                     # 1. Fast template matching first (bypass slow OCR if we have high-confidence match)
@@ -446,6 +455,7 @@ class VisionDetector(BaseDetector):
                     if t_hero and t_score >= 0.85:
                         best_hero_id = t_hero
                         best_score = t_score
+                        match_method = "template_fast"
 
                     # 2. OCR fallback
                     if best_hero_id is None:
@@ -470,6 +480,7 @@ class VisionDetector(BaseDetector):
                             if hero_id and conf > 0.4:
                                 best_hero_id = hero_id
                                 best_score = conf
+                                match_method = "ocr"
                                 print(
                                     f"VisionDetector OCR: '{hero_id}' in {category}[{idx}] (conf={conf:.2f})"
                                 )
@@ -478,6 +489,7 @@ class VisionDetector(BaseDetector):
                     if best_hero_id is None and t_hero and t_score >= 0.75:
                         best_hero_id = t_hero
                         best_score = t_score
+                        match_method = "template_soft"
 
                 else:  # ban step
                     # 1. Try full template matching
@@ -485,6 +497,7 @@ class VisionDetector(BaseDetector):
                     if t_hero and t_score >= 0.75:
                         best_hero_id = t_hero
                         best_score = t_score
+                        match_method = "template_full"
                     else:
                         # 2. Try top-half-only template matching to bypass the red/blue ban overlay bar
                         t_hero, t_score = self._match_templates(
@@ -493,6 +506,7 @@ class VisionDetector(BaseDetector):
                         if t_hero and t_score >= 0.70:
                             best_hero_id = t_hero
                             best_score = t_score
+                            match_method = "template_top_only"
 
                 # Process stability tracking for this slot index
                 slot_key = f"{category}_{idx}"
@@ -507,6 +521,60 @@ class VisionDetector(BaseDetector):
                     )
                     if best_hero_id
                     else False
+                )
+
+                # Capture debug info before potential state advance
+                import base64
+
+                crop_base64 = ""
+                try:
+                    _, buffer = cv2.imencode(".jpg", square_crop)
+                    crop_base64 = "data:image/jpeg;base64," + base64.b64encode(
+                        buffer
+                    ).decode("utf-8")
+                except Exception as e:
+                    print(f"Failed to encode debug crop: {e}")
+
+                try:
+                    gray_tmp = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+                    mean_val = float(gray_tmp.mean())
+                except Exception:
+                    mean_val = 0.0
+                is_empty = mean_val < 40.0
+
+                _, current_count = self.detection_history.get(slot_key, (None, 0))
+
+                # If stable match is about to succeed, increment count for debug representation
+                debug_count = current_count
+                if best_hero_id and not is_already_taken:
+                    current_candidate, _ = self.detection_history.get(
+                        slot_key, (None, 0)
+                    )
+                    if current_candidate == best_hero_id:
+                        debug_count += 1
+                    else:
+                        debug_count = 1
+
+                display_hero_id = best_hero_id
+                display_score = best_score
+                display_method = match_method
+                if display_hero_id is None and "t_hero" in locals() and t_hero:
+                    display_hero_id = t_hero
+                    display_score = t_score
+                    display_method = "below_threshold"
+
+                debug_slots.append(
+                    {
+                        "category": category,
+                        "idx": idx,
+                        "crop_base64": crop_base64,
+                        "best_hero_id": display_hero_id,
+                        "best_score": float(display_score),
+                        "match_method": display_method,
+                        "is_empty": bool(is_empty),
+                        "is_already_taken": bool(is_already_taken),
+                        "stability_count": int(debug_count),
+                    }
                 )
 
                 if best_hero_id and not is_already_taken:
@@ -538,3 +606,6 @@ class VisionDetector(BaseDetector):
                 else:
                     if slot_key in self.detection_history:
                         self.detection_history.pop(slot_key, None)
+
+        if self.on_debug_callback and debug_slots:
+            self.on_debug_callback({"timestamp": time.time(), "slots": debug_slots})

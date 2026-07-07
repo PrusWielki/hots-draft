@@ -70,7 +70,10 @@ async def startup_event():
     def on_match():
         asyncio.run_coroutine_threadsafe(broadcast_state(), loop)
 
-    VISION_DETECTOR = VisionDetector(portraits_dir, DRAFT_MANAGER, on_match)
+    def on_debug(debug_payload):
+        asyncio.run_coroutine_threadsafe(broadcast_debug(debug_payload), loop)
+
+    VISION_DETECTOR = VisionDetector(portraits_dir, DRAFT_MANAGER, on_match, on_debug)
     VISION_DETECTOR.start()
 
 
@@ -124,6 +127,24 @@ async def broadcast_state():
         return
 
     payload = get_current_payload()
+    dead_sockets = set()
+
+    for ws in ACTIVE_WEBSOCKETS:
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead_sockets.add(ws)
+
+    for ws in dead_sockets:
+        ACTIVE_WEBSOCKETS.remove(ws)
+
+
+async def broadcast_debug(debug_payload: dict):
+    """Broadcast the live CV detector debug info to all clients."""
+    if not ACTIVE_WEBSOCKETS:
+        return
+
+    payload = {"event_type": "debug_update", "debug": debug_payload}
     dead_sockets = set()
 
     for ws in ACTIVE_WEBSOCKETS:
