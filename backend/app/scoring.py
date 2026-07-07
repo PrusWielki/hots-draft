@@ -46,6 +46,34 @@ def score_heroes(
     ranged_assassins = ally_roles.count(HotsRole.RANGED_ASSASSIN)
     melee_assassins = ally_roles.count(HotsRole.MELEE_ASSASSIN)
 
+    # Identify damage types of picked Ranged Assassins for composition balancing
+    physical_ranged_ids = {
+        "valla",
+        "raynor",
+        "zuljin",
+        "fenix",
+        "sgt-hammer",
+        "tracer",
+        "tychus",
+        "cassia",
+        "greymane",
+        "lunara",
+        "hanzo",
+        "sylvanas",
+        "falstad",
+    }
+    picked_ranged_assassins = [
+        h_id
+        for h_id in draft_state.my_team_picks
+        if h_id in hero_db and hero_db[h_id].role == HotsRole.RANGED_ASSASSIN
+    ]
+    has_physical_ranged = any(
+        h_id in physical_ranged_ids for h_id in picked_ranged_assassins
+    )
+    has_magical_ranged = any(
+        h_id not in physical_ranged_ids for h_id in picked_ranged_assassins
+    )
+
     for hero_id, hero in hero_db.items():
         if hero_id in unavailable:
             continue
@@ -111,6 +139,31 @@ def score_heroes(
             if ranged_assassins == 0:
                 base_score += 20.0
                 reasons.append("Missing Ranged damage dealer (+20 pts)")
+            elif ranged_assassins == 1:
+                # Aim for 1 physical and 1 magical ranged damage dealer mix
+                is_curr_physical = hero_id in physical_ranged_ids
+                if is_curr_physical:
+                    if has_magical_ranged:
+                        base_score += 15.0
+                        reasons.append(
+                            "Balanced damage: adding Physical Ranged Assassin to compliment Magical (+15 pts)"
+                        )
+                    else:
+                        base_score -= 15.0
+                        reasons.append(
+                            "Saturated damage: already have a Physical Ranged Assassin (-15 pts)"
+                        )
+                else:  # current is magical
+                    if has_physical_ranged:
+                        base_score += 15.0
+                        reasons.append(
+                            "Balanced damage: adding Magical Ranged Assassin to compliment Physical (+15 pts)"
+                        )
+                    else:
+                        base_score -= 15.0
+                        reasons.append(
+                            "Saturated damage: already have a Magical Ranged Assassin (-15 pts)"
+                        )
             elif ranged_assassins >= 2:
                 base_score -= 10.0
                 reasons.append("Sufficient Ranged damage already present (-10 pts)")
