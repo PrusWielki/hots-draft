@@ -335,6 +335,11 @@ class VisionDetector(BaseDetector):
             return None, 0.0
 
         gray_crop = cv2.cvtColor(square_crop, cv2.COLOR_BGR2GRAY)
+
+        # Skip template matching if this is a pick slot and it is empty/dark (intensity < 40.0)
+        if action == "pick" and gray_crop.mean() < 40.0:
+            return None, 0.0
+
         resized_crop = cv2.resize(gray_crop, (100, 100))
         cl_crop = self.clahe.apply(resized_crop)
 
@@ -393,14 +398,8 @@ class VisionDetector(BaseDetector):
                 self.draft_manager.current_step_idx, step.action
             )
         else:
-            picks_so_far = (
-                len(self.draft_manager.my_team_picks)
-                if step.team == "my_team"
-                else len(self.draft_manager.enemy_picks)
-            )
-            active_indices = (
-                [picks_so_far] if picks_so_far < len(self.coordinates[category]) else []
-            )
+            # Picks can happen in any visual order on the screen, so scan all 5 slots
+            active_indices = [0, 1, 2, 3, 4]
 
         if not active_indices:
             return
