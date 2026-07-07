@@ -192,6 +192,16 @@ def score_bans(
         + draft_state.enemy_bans
     )
 
+    enemy_roles = [
+        hero_db[h_id].role for h_id in draft_state.enemy_picks if h_id in hero_db
+    ]
+    enemy_has_tank = HotsRole.TANK in enemy_roles
+    enemy_has_healer = HotsRole.HEALER in enemy_roles
+    enemy_has_bruiser = HotsRole.BRUISER in enemy_roles
+
+    # Check if we are in mid-ban phase (where target role choking is highly effective)
+    is_mid_ban = len(draft_state.enemy_picks) >= 2
+
     for hero_id, hero in hero_db.items():
         if hero_id in unavailable:
             continue
@@ -210,6 +220,37 @@ def score_bans(
         if hero.recommended_ban:
             score += 25.0
             reasons.append("High meta ban priority (+25 pts)")
+
+        # Role/composition-based ban adjustments
+        if hero.role == HotsRole.TANK:
+            if enemy_has_tank:
+                score -= 50.0
+                reasons.append("Enemy already has a Tank (low ban value) (-50 pts)")
+            elif is_mid_ban:
+                score += 10.0
+                reasons.append(
+                    "Enemy is missing a Tank; target ban frontline (+10 pts)"
+                )
+
+        elif hero.role == HotsRole.HEALER:
+            if enemy_has_healer:
+                score -= 50.0
+                reasons.append("Enemy already has a Healer (low ban value) (-50 pts)")
+            elif is_mid_ban:
+                score += 15.0
+                reasons.append(
+                    "Enemy is missing a Healer; target ban support (+15 pts)"
+                )
+
+        elif hero.role == HotsRole.BRUISER:
+            if enemy_has_bruiser:
+                score -= 20.0
+                reasons.append("Enemy already has a Bruiser (low ban value) (-20 pts)")
+            elif is_mid_ban:
+                score += 5.0
+                reasons.append(
+                    "Enemy is missing a Bruiser; target ban offlane (+5 pts)"
+                )
 
         # Global stats ban weight: win rate deviation + ban rate weight
         if hero_id in WIN_RATES:
