@@ -262,6 +262,20 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
     5. Fuzzy first-word match (handles truncation like "JASNOSKRZY"→brightwing)
     Returns None if no confident match found.
     """
+    cleaned_lower = raw_text.strip().lower()
+    if (
+        cleaned_lower.startswith("si:")
+        or cleaned_lower.startswith("ai:")
+        or cleaned_lower.startswith("bot:")
+        or cleaned_lower.startswith("a.i.")
+        or cleaned_lower.startswith("si ")
+        or cleaned_lower.startswith("ai ")
+        or cleaned_lower.startswith("bot ")
+        or cleaned_lower.startswith("computer")
+        or cleaned_lower.startswith("komputer")
+    ):
+        return None
+
     normalized = _normalize(raw_text)
     if not normalized:
         return None
