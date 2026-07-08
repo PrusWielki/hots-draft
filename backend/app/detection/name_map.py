@@ -238,7 +238,6 @@ _CUSTOM_ALIASES = {
     "WIKINGOWIE": "lost-vikings",
     "ZAGINIENI WIKINGOWIE": "lost-vikings",
     "ZAGUBIENI WIKINGOWIE": "lost-vikings",
-    "KELTHAS": "kaelthas",
 }
 for alias, h_id in _CUSTOM_ALIASES.items():
     _LOOKUP[alias] = h_id
@@ -299,6 +298,18 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
         "ELTASZ",
         "ELIASZ",
         "ELASZ",
+        "ELITA",
+        "WETERAN",
+        "NOWICJUSZ",
+        "ADEPT",
+        "EKSPERT",
+        "UCZEN",
+        "ELITARNY",
+        "ELITE",
+        "VETERAN",
+        "RECRUIT",
+        "BEGINNER",
+        "EXPERT",
     }
     if normalized in _LOBBY_WORDS or (
         normalized.split() and normalized.split()[0] in _LOBBY_WORDS
