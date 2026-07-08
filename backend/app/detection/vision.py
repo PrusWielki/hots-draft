@@ -470,7 +470,7 @@ class VisionDetector(BaseDetector):
 
                         if ocr_available():
                             is_ally = category == "ally_picks"
-                            BANNER_PAD = 150
+                            BANNER_PAD = 300
                             if is_ally:
                                 x_ocr = max(0, x - BANNER_PAD)
                                 w_ocr = (x + w) - x_ocr

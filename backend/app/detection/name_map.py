@@ -262,6 +262,26 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
     if not normalized:
         return None
 
+    # Ignore draft lobby state text (Polish and English) to prevent false fuzzy matching
+    _LOBBY_WORDS = {
+        "WYBIERA",
+        "BLOKUJE",
+        "BANUJE",
+        "CHOOSING",
+        "PICKING",
+        "BANNING",
+        "WYBIERZ",
+        "CHOOSE",
+        "LOCK",
+        "ZABLOKUJ",
+        "LOCKING",
+        "ZATWIERDZ",
+    }
+    if normalized in _LOBBY_WORDS or (
+        normalized.split() and normalized.split()[0] in _LOBBY_WORDS
+    ):
+        return None
+
     # Also compute a letters-only version (strips digits and stray punctuation like commas/semicolons)
     # This handles OCR artifacts like "SO," → "SO" and "THR;" → "THR"
     letters_only = re.sub(r"[^A-Z]", "", normalized)
