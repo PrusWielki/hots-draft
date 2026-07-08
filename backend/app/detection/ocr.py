@@ -109,18 +109,11 @@ def ocr_hero_from_crop(
     # Noise patterns to skip: player tags, punctuation-only, very short text
     _NOISE_RE = re.compile(r"^(sl|si|[^a-zA-Z]+|.{1,2})$", re.IGNORECASE)
 
-    def _is_player_name(t: str) -> bool:
-        """Title-case single word → likely a player account name, not a hero name."""
-        s = re.sub(r"[^a-zA-Z]", "", t)
-        return len(s) >= 3 and s[0].isupper() and s[1:].islower()
-
     # Collect clean text segments with confidence
     texts: list[tuple[str, float]] = [
         (text, conf)
         for (_bbox, text, conf) in results
-        if not _NOISE_RE.match(text.strip())
-        and not _is_player_name(text.strip())
-        and conf > 0.15
+        if not _NOISE_RE.match(text.strip()) and conf > 0.15
     ]
 
     if debug:
