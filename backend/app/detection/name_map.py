@@ -239,9 +239,6 @@ _CUSTOM_ALIASES = {
     "ZAGINIENI WIKINGOWIE": "lost-vikings",
     "ZAGUBIENI WIKINGOWIE": "lost-vikings",
     "KELTHAS": "kaelthas",
-    "ALTHAS": "kaelthas",
-    "AELTHAS": "kaelthas",
-    "ELTHAS": "kaelthas",
 }
 for alias, h_id in _CUSTOM_ALIASES.items():
     _LOOKUP[alias] = h_id
@@ -341,9 +338,10 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
                 )
                 return best[1]
         # 4. Fuzzy full
-        m = get_close_matches(query, _ALL_NORMALIZED, n=1, cutoff=cutoff)
-        if m:
-            return _LOOKUP[m[0]]
+        if len(query) >= 4:
+            m = get_close_matches(query, _ALL_NORMALIZED, n=1, cutoff=cutoff)
+            if m:
+                return _LOOKUP[m[0]]
         # 5. Fuzzy first-word
         if len(first) >= 4:
             m = get_close_matches(first, _ALL_NORMALIZED, n=1, cutoff=cutoff)
