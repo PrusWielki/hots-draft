@@ -64,7 +64,7 @@ _POLISH_NAMES: dict[str, str] = {
     "jaina":            "Jaina",
     "johanna":          "Johanna",
     "junkrat":          "Złomiarz",
-    "kaelthas":         "Kel'thas",
+    "kaelthas":         "Kael'thas",
     "kelthuzad":        "Kel'Thuzad",
     "kerrigan":         "Kerrigan",
     "kharazim":         "Kharazim",
@@ -238,6 +238,10 @@ _CUSTOM_ALIASES = {
     "WIKINGOWIE": "lost-vikings",
     "ZAGINIENI WIKINGOWIE": "lost-vikings",
     "ZAGUBIENI WIKINGOWIE": "lost-vikings",
+    "KELTHAS": "kaelthas",
+    "ALTHAS": "kaelthas",
+    "AELTHAS": "kaelthas",
+    "ELTHAS": "kaelthas",
 }
 for alias, h_id in _CUSTOM_ALIASES.items():
     _LOOKUP[alias] = h_id
