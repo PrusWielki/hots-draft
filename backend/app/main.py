@@ -76,6 +76,20 @@ async def startup_event():
     VISION_DETECTOR = VisionDetector(portraits_dir, DRAFT_MANAGER, on_match, on_debug)
     VISION_DETECTOR.start()
 
+    # Warm up EasyOCR reader in the background so pick detection starts instantly with no lag
+    import threading
+
+    def warm_up_ocr():
+        try:
+            from app.detection.ocr import _get_reader
+
+            _get_reader()
+            logger.info("EasyOCR reader warmed up in the background.")
+        except Exception as e:
+            logger.error(f"Failed to warm up EasyOCR reader: {e}")
+
+    threading.Thread(target=warm_up_ocr, daemon=True).start()
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
