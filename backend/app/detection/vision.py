@@ -602,7 +602,17 @@ class VisionDetector(BaseDetector):
                         self.detection_history.pop(slot_key, None)
                         if success:
                             self.on_match_callback()
-                            break  # Stop scanning other slots in this frame after successful match to allow step state to advance
+
+                            # If the next step is still a pick for the same team, continue scanning in this frame
+                            next_step = self.draft_manager.get_current_step()
+                            if (
+                                next_step
+                                and next_step.action == "pick"
+                                and next_step.team == step.team
+                            ):
+                                continue
+                            else:
+                                break  # Stop scanning to prevent race conditions on step transitions
                         else:
                             print(
                                 f"VisionDetector: Attempted to apply '{best_hero_id}' in {category}[{idx}] but draft manager rejected it (already picked/banned or invalid step)."
