@@ -283,17 +283,25 @@ def name_to_hero_id(raw_text: str, cutoff: float = 0.65) -> str | None:
     # Ignore draft lobby state text (Polish and English) to prevent false fuzzy matching
     _LOBBY_WORDS = {
         "WYBIERA",
+        "WYBIERASZ",
+        "WYBIERAS",
+        "YBIERASZ",
+        "YBIERAS",
+        "WYBIERZ",
+        "WYBIERANIE",
         "BLOKUJE",
         "BANUJE",
         "CHOOSING",
         "PICKING",
         "BANNING",
-        "WYBIERZ",
         "CHOOSE",
         "LOCK",
         "ZABLOKUJ",
         "LOCKING",
         "ZATWIERDZ",
+        "ELTASZ",
+        "ELIASZ",
+        "ELASZ",
     }
     if normalized in _LOBBY_WORDS or (
         normalized.split() and normalized.split()[0] in _LOBBY_WORDS
