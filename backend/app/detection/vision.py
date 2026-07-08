@@ -78,6 +78,8 @@ class VisionDetector(BaseDetector):
         self.ban_templates: Dict[str, Any] = {}
         self.coordinates = DEFAULT_COORDINATES
         self.detection_history: Dict[str, tuple[str, int]] = {}
+        self.locked_slots: Dict[str, str] = {}
+        self.locked_slots_debug_cache: Dict[str, dict] = {}
         self.cooldown_until = 0.0
 
         if OPENCV_AVAILABLE:
@@ -223,6 +225,8 @@ class VisionDetector(BaseDetector):
     def reset(self):
         """Reset the detector's state, clearing detection history and cooldown."""
         self.detection_history.clear()
+        self.locked_slots.clear()
+        self.locked_slots_debug_cache.clear()
         self.cooldown_until = 0.0
 
     def _loop(self):
@@ -426,6 +430,24 @@ class VisionDetector(BaseDetector):
                 if idx >= len(self.coordinates[category]):
                     continue
 
+                slot_key = f"{category}_{idx}"
+
+                # If this slot was previously locked and is still present in draft picks, skip scanning it!
+                previously_locked_hero = self.locked_slots.get(slot_key)
+                if previously_locked_hero:
+                    still_present = (
+                        previously_locked_hero in self.draft_manager.my_team_picks
+                        or previously_locked_hero in self.draft_manager.enemy_picks
+                    )
+                    if still_present:
+                        cached_debug = self.locked_slots_debug_cache.get(slot_key)
+                        if cached_debug:
+                            debug_slots.append(cached_debug)
+                        continue
+                    else:
+                        self.locked_slots.pop(slot_key, None)
+                        self.locked_slots_debug_cache.pop(slot_key, None)
+
                 slot = self.coordinates[category][idx]
                 x = int(slot["x"] * scale_x)
                 y = int(slot["y"] * scale_y)
@@ -601,6 +623,11 @@ class VisionDetector(BaseDetector):
                         success = self.draft_manager.apply_action(best_hero_id)
                         self.detection_history.pop(slot_key, None)
                         if success:
+                            self.locked_slots[slot_key] = best_hero_id
+                            if debug_slots:
+                                self.locked_slots_debug_cache[slot_key] = debug_slots[
+                                    -1
+                                ]
                             self.on_match_callback()
 
                             # If the next step is still a pick for the same team, continue scanning in this frame
