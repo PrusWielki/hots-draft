@@ -91,9 +91,9 @@ def score_heroes(
             ally = hero_db[ally_id]
             synergy_bonus = 0.0
             if ally_id in hero.synergies:
-                synergy_bonus += 15.0
+                synergy_bonus += 20.0
             if hero_id in ally.synergies:
-                synergy_bonus += 15.0
+                synergy_bonus += 20.0
 
             if synergy_bonus > 0:
                 base_score += synergy_bonus
