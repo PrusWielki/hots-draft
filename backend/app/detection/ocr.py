@@ -54,8 +54,8 @@ def extract_name_region(
     import cv2
 
     h, w = crop_bgr.shape[:2]
-    name_y0 = int(h * 0.72)
-    name_y1 = int(h * 0.88)
+    name_y0 = int(h * 0.54)
+    name_y1 = int(h * 0.86)
 
     # Use the full width — the banner text can be anywhere across the extended crop
     region = crop_bgr[name_y0:name_y1, :]
@@ -109,12 +109,15 @@ def ocr_hero_from_crop(
     # Noise patterns to skip: player tags, punctuation-only, very short text
     _NOISE_RE = re.compile(r"^(sl|si|[^a-zA-Z]+|.{1,2})$", re.IGNORECASE)
 
-    # Collect clean text segments with confidence
-    texts: list[tuple[str, float]] = [
-        (text, conf)
-        for (_bbox, text, conf) in results
-        if not _NOISE_RE.match(text.strip()) and conf > 0.15
-    ]
+    # Collect clean text segments with confidence, ignoring anything in the bottom half (player name line)
+    H = name_region.shape[0]
+    texts: list[tuple[str, float]] = []
+    for bbox, text, conf in results:
+        y_center = (bbox[0][1] + bbox[2][1]) / 2.0
+        if y_center > 0.55 * H:
+            continue  # Skip player account name line
+        if not _NOISE_RE.match(text.strip()) and conf > 0.15:
+            texts.append((text, conf))
 
     if debug:
         print(f"  OCR raw results: {[(t, round(c, 4)) for _,t,c in results]}")
